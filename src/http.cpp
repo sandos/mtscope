@@ -1,7 +1,7 @@
 #include "http.h"
 
 #include <arpa/inet.h>
-#include <cstring>
+#include <fstream>
 #include <iostream>
 #include <netinet/in.h>
 #include <stdexcept>
@@ -10,7 +10,6 @@
 
 #include "app.h"
 #include "database.h"
-#include "page.h"
 
 namespace {
 
@@ -20,9 +19,18 @@ void send_response(int client, const char* type, const std::string& body) {
     send(client, body.data(), body.size(), MSG_NOSIGNAL);
 }
 
+std::string load_asset(const std::string& web_root, const char* name) {
+    std::ifstream file(web_root + "/" + name);
+    if (!file) throw std::runtime_error("Unable to read dashboard asset " + web_root + "/" + name);
+    return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+}
+
 } // namespace
 
-void serve_http(Database& database, int port) {
+void serve_http(Database& database, int port, const std::string& web_root) {
+    const std::string index = load_asset(web_root, "index.html");
+    const std::string stylesheet = load_asset(web_root, "styles.css");
+    const std::string script = load_asset(web_root, "app.js");
     const int server = socket(AF_INET, SOCK_STREAM, 0);
     if (server < 0) throw std::runtime_error("Unable to create HTTP socket");
     int enabled = 1;
@@ -48,7 +56,9 @@ void serve_http(Database& database, int port) {
         const std::string line(request, size > 0 ? static_cast<size_t>(size) : 0);
         if (line.rfind("GET /api/packets ", 0) == 0) send_response(client, "application/json", database.recent_json());
         else if (line.rfind("GET /api/nodes ", 0) == 0) send_response(client, "application/json", database.nodes_json());
-        else send_response(client, "text/html", PAGE_TABS);
+        else if (line.rfind("GET /styles.css ", 0) == 0) send_response(client, "text/css", stylesheet);
+        else if (line.rfind("GET /app.js ", 0) == 0) send_response(client, "application/javascript", script);
+        else send_response(client, "text/html", index);
         close(client);
     }
 }

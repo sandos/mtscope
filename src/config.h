@@ -9,6 +9,7 @@ struct Config {
     std::string password = "msh";
     std::string topic = "msh/#";
     std::string database = "meshat-monitor.db";
+    std::string web_root = "web";
     int retention_days = 3;
     int http_port = 8099;
 };

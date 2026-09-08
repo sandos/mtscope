@@ -10,7 +10,7 @@ module.exports = defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'rm -f playwright-test.db && ./build/release/meshat-monitor --database ./playwright-test.db --host 127.0.0.1 --http-port 18099',
+    command: 'rm -f playwright-test.db && ./build/release/meshat-monitor --database ./playwright-test.db --host 127.0.0.1 --http-port 18099 --web-root ./web',
     url: 'http://127.0.0.1:18099',
     reuseExistingServer: false,
     timeout: 15_000,

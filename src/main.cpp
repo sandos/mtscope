@@ -23,12 +23,13 @@ Config parse_args(int argc, char** argv) {
     for (int index = 1; index < argc; ++index) {
         const std::string option = argv[index];
         if (option == "--help") {
-            std::cout << "Usage: meshat-monitor [--database PATH] [--topic MQTT_TOPIC] [--retention-days DAYS] [--http-port PORT]\n";
+            std::cout << "Usage: meshat-monitor [--database PATH] [--web-root PATH] [--topic MQTT_TOPIC] [--retention-days DAYS] [--http-port PORT]\n";
             std::exit(0);
         }
         if (index + 1 >= argc) throw std::runtime_error("Missing value for " + option);
         const std::string value = argv[++index];
         if (option == "--database") config.database = value;
+        else if (option == "--web-root") config.web_root = value;
         else if (option == "--retention-days") config.retention_days = std::stoi(value);
         else if (option == "--topic") config.topic = value;
         else if (option == "--http-port") config.http_port = std::stoi(value);
@@ -53,7 +54,7 @@ int main(int argc, char** argv) {
         database.purge(config.retention_days);
         Monitor monitor(config, database);
         monitor.run();
-        std::thread web([&] { serve_http(database, config.http_port); });
+        std::thread web([&] { serve_http(database, config.http_port, config.web_root); });
         auto next_purge = std::chrono::steady_clock::now() + std::chrono::hours(1);
         while (running) {
             std::this_thread::sleep_for(std::chrono::seconds(1));

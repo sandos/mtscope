@@ -42,7 +42,6 @@ set(MESHTAT_MONITOR_SOURCES
 	src/database.cpp
 	src/monitor.cpp
 	src/http.cpp
-	src/page.cpp
 )
 
 add_executable(meshat-monitor ${MESHTAT_MONITOR_SOURCES} ${MESHTASTIC_PROTO_SOURCES})
@@ -56,6 +55,7 @@ endif()
 target_compile_options(meshat-monitor PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS meshat-monitor RUNTIME DESTINATION bin)
+install(DIRECTORY web/ DESTINATION share/meshat-monitor)
 
 if(BUILD_TESTING)
 	include(FetchContent)

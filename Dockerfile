@@ -8,6 +8,7 @@ RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j"$(n
 FROM ghcr.io/home-assistant/${BUILD_ARCH}-base:3.21
 RUN apk add --no-cache libmosquitto sqlite-libs openssl
 COPY --from=build /build/build/meshat-monitor /usr/local/bin/meshat-monitor
+COPY web /usr/local/share/meshat-monitor
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 VOLUME ["/data"]

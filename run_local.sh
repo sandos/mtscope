@@ -7,6 +7,7 @@ DATABASE="${MTSCOPE_DATABASE:-$SCRIPT_DIR/meshat-monitor.db}"
 TOPIC="${MTSCOPE_TOPIC:-msh/#}"
 RETENTION_DAYS="${MTSCOPE_RETENTION_DAYS:-3}"
 HTTP_PORT="${MTSCOPE_HTTP_PORT:-8099}"
+WEB_ROOT="${MTSCOPE_WEB_ROOT:-$SCRIPT_DIR/web}"
 
 if [[ ! -x "$BINARY" ]]; then
     printf 'Monitor binary not found or not executable: %s\n' "$BINARY" >&2
@@ -19,4 +20,5 @@ exec "$BINARY" \
     --topic "$TOPIC" \
     --retention-days "$RETENTION_DAYS" \
     --http-port "$HTTP_PORT" \
+    --web-root "$WEB_ROOT" \
     "$@"

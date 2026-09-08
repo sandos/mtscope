@@ -15,7 +15,7 @@ cmake --build --preset release
 
 Open `http://localhost:8099`. Use `--topic` to narrow the subscription, for example `msh/SE/2/json/#`.
 
-The same local defaults are available through `./run_local.sh`. It uses `meshat-monitor.db` beside the script and supports `MTSCOPE_DATABASE`, `MTSCOPE_TOPIC`, `MTSCOPE_RETENTION_DAYS`, and `MTSCOPE_HTTP_PORT` environment overrides. Extra command-line options are passed to the monitor.
+The same local defaults are available through `./run_local.sh`. It uses `meshat-monitor.db` beside the script and supports `MTSCOPE_DATABASE`, `MTSCOPE_TOPIC`, `MTSCOPE_RETENTION_DAYS`, `MTSCOPE_HTTP_PORT`, and `MTSCOPE_WEB_ROOT` environment overrides. Extra command-line options are passed to the monitor.
 
 ## Browser tests
 
@@ -40,7 +40,7 @@ The tests start the locally built monitor on port `18099` with an isolated datab
 
 - SQLite is configured with WAL and `synchronous=NORMAL` to keep writes inexpensive.
 - Inserts and retention deletes are prepared statements, and the time index makes purging bounded by expired data.
-- Only the latest 100 packets are queried by the dashboard; MQTT data is never retained in application memory.
+- Only the latest 500 packets are queried by the dashboard; MQTT data is never retained in application memory.
 - Topic metadata and common JSON fields (`type`, `$typeName`, `sender`, and `channel`) are parsed into SQLite columns. Binary or encrypted payloads remain stored and displayed as hexadecimal when they cannot be decoded.
 - When built with OpenSSL, encrypted packets are tried against Meshtastic's public default channel key (the firmware's `AQ==` key alias). Decrypted text, position, node-info, and telemetry packets use the same normalized measurements path. Private channel keys and direct-message PKC decryption are not attempted.
 - Decoded application data is also inserted into `measurements`, linked to the raw packet by `packet_id`. It currently normalizes text, position, node info, and telemetry fields such as battery, voltage, temperature, humidity, and pressure.

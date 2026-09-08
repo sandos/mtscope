@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Meshtastic Monitor</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main>
+    <h1>Meshtastic Monitor</h1>
+    <p id="status">Loading recent data...</p>
+    <nav role="tablist">
+      <button id="packets-tab" role="tab" aria-selected="true" aria-controls="packets-panel">Packets</button>
+      <button id="nodes-tab" role="tab" aria-selected="false" aria-controls="nodes-panel">Nodes</button>
+    </nav>
+    <section id="packets-panel" role="tabpanel" aria-labelledby="packets-tab">
+      <label class="filter">Filter packets <input id="packet-filter" type="search" placeholder="Topic, node, packet, sender, or detail"></label>
+      <table><thead><tr><th><button type="button" data-table="packets" data-key="received_at">Received</button></th><th><button type="button" data-table="packets" data-key="topic">Topic</button></th><th><button type="button" data-table="packets" data-key="region">Region</button></th><th><button type="button" data-table="packets" data-key="channel">Channel</button></th><th><button type="button" data-table="packets" data-key="node">Node</button></th><th><button type="button" data-table="packets" data-key="packet_type">Packet</button></th><th><button type="button" data-table="packets" data-key="sender">Sender</button></th><th>Details</th></tr></thead><tbody id="packets"></tbody></table>
+    </section>
+    <section id="nodes-panel" role="tabpanel" aria-labelledby="nodes-tab" hidden>
+      <label class="filter">Filter nodes <input id="node-filter" type="search" placeholder="Name, ID, hardware, or role"></label>
+      <table><thead><tr><th><button type="button" data-table="nodes" data-key="node_id">Node ID</button></th><th><button type="button" data-table="nodes" data-key="long_name">Long name</button></th><th><button type="button" data-table="nodes" data-key="short_name">Short name</button></th><th><button type="button" data-table="nodes" data-key="hardware_model">Hardware</button></th><th><button type="button" data-table="nodes" data-key="role">Role</button></th><th><button type="button" data-table="nodes" data-key="is_licensed">Licensed</button></th><th><button type="button" data-table="nodes" data-key="is_unmessagable">Messaging</button></th><th><button type="button" data-table="nodes" data-key="has_public_key">PKI</button></th><th><button type="button" data-table="nodes" data-key="last_seen">Last seen</button></th></tr></thead><tbody id="nodes"></tbody></table>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
