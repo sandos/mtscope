@@ -56,7 +56,7 @@ function updateSortIndicators() {
 
 function renderPackets() {
   const packets = visibleItems('packets');
-  packetBody.innerHTML = packets.map(packet => `<tr><td>${new Date(packet.received_at * 1000).toLocaleString()}</td><td class="topic-cell"><code>${esc(packet.topic)}</code><span class="meta">${esc(packet.transport)} / ${esc(packet.encoding)}</span></td><td>${esc(packet.region)}</td><td>${esc(packet.channel)}</td><td>${esc(packet.node)}</td><td><strong>${esc(packet.packet_type) || '<span class="muted">binary</span>'}</strong><span class="meta">${esc(packet.sender)}</span></td><td>${esc(packet.sender)}</td><td class="detail">${details(packet)}<details class="raw"><summary>Raw payload</summary><code>${esc(packet.decoded_payload_hex || packet.payload_hex)}</code></details></td></tr>`).join('');
+  packetBody.innerHTML = packets.map(packet => `<tr><td>${new Date(packet.received_at * 1000).toLocaleString()}</td><td class="topic-cell"><details class="topic"><summary>View</summary><code>${esc(packet.topic)}</code><span class="meta">${esc(packet.transport)} / ${esc(packet.encoding)}</span></details></td><td>${esc(packet.region)}</td><td>${esc(packet.channel)}</td><td>${esc(packet.node)}</td><td><strong>${esc(packet.packet_type) || '<span class="muted">binary</span>'}</strong></td><td>${esc(packet.sender)}</td><td class="detail">${details(packet)}<details class="raw"><summary>Raw payload</summary><code>${esc(packet.decoded_payload_hex || packet.payload_hex)}</code></details></td></tr>`).join('');
 }
 
 function yesNo(value) { return value == null ? '<span class="muted">Unknown</span>' : value ? 'Yes' : 'No'; }
