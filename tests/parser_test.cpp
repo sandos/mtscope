@@ -1,8 +1,9 @@
-#define main meshat_monitor_main
-#include "../src/main.cpp"
-#undef main
+#include "../src/packet.h"
+
+#include <cstring>
 
 #include <gtest/gtest.h>
+#include "meshtastic/mqtt.pb.h"
 
 #ifdef MTSCOPE_HAVE_OPENSSL
 #include <openssl/evp.h>

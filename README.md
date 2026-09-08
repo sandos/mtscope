@@ -15,6 +15,8 @@ cmake --build --preset release
 
 Open `http://localhost:8099`. Use `--topic` to narrow the subscription, for example `msh/SE/2/json/#`.
 
+The same local defaults are available through `./run_local.sh`. It uses `meshat-monitor.db` beside the script and supports `MTSCOPE_DATABASE`, `MTSCOPE_TOPIC`, `MTSCOPE_RETENTION_DAYS`, and `MTSCOPE_HTTP_PORT` environment overrides. Extra command-line options are passed to the monitor.
+
 ## Browser tests
 
 The dashboard has Playwright end-to-end tests. Install a native Linux Node.js installation (or use WSL2; WSL1 and Windows `npm` paths are not supported), then run:

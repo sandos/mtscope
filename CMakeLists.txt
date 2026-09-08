@@ -36,7 +36,16 @@ add_custom_command(
 )
 add_custom_target(meshtastic-protobufs DEPENDS ${MESHTASTIC_PROTO_SOURCES} ${MESHTASTIC_PROTO_HEADERS})
 
-add_executable(meshat-monitor src/main.cpp ${MESHTASTIC_PROTO_SOURCES})
+set(MESHTAT_MONITOR_SOURCES
+	src/main.cpp
+	src/packet.cpp
+	src/database.cpp
+	src/monitor.cpp
+	src/http.cpp
+	src/page.cpp
+)
+
+add_executable(meshat-monitor ${MESHTAT_MONITOR_SOURCES} ${MESHTASTIC_PROTO_SOURCES})
 add_dependencies(meshat-monitor meshtastic-protobufs)
 target_include_directories(meshat-monitor PRIVATE ${MOSQUITTO_INCLUDE_DIR} "${MESHTASTIC_PROTO_GENERATED_DIR}")
 target_link_libraries(meshat-monitor PRIVATE ${MOSQUITTO_LIBRARY} SQLite::SQLite3 protobuf::libprotobuf)
@@ -58,7 +67,7 @@ if(BUILD_TESTING)
 	set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 	FetchContent_MakeAvailable(googletest)
 
-	add_executable(meshat-monitor-tests tests/parser_test.cpp ${MESHTASTIC_PROTO_SOURCES})
+	add_executable(meshat-monitor-tests tests/parser_test.cpp src/packet.cpp ${MESHTASTIC_PROTO_SOURCES})
 	add_dependencies(meshat-monitor-tests meshtastic-protobufs)
 	target_include_directories(meshat-monitor-tests PRIVATE ${MOSQUITTO_INCLUDE_DIR} "${MESHTASTIC_PROTO_GENERATED_DIR}")
 	target_link_libraries(meshat-monitor-tests PRIVATE GTest::gtest_main ${MOSQUITTO_LIBRARY} SQLite::SQLite3 protobuf::libprotobuf)
