@@ -1,0 +1,22 @@
+name: Meshat Monitor
+slug: meshat_monitor
+description: Stores Meshtastic MQTT packets locally and presents a compact dashboard
+version: "0.1.0"
+arch:
+  - aarch64
+  - amd64
+  - armv7
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: Meshat Monitor dashboard
+options:
+  topic: "msh/#"
+  retention_days: 3
+  http_port: 8099
+schema:
+  topic: str
+  retention_days: int(1,30)
+  http_port: port?
+init: false
+startup: services

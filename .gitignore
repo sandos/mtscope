@@ -1,0 +1,27 @@
+# CMake build trees
+/build/
+cmake-build-*/
+
+# Generated protobuf C++ files
+**/generated/
+
+# Runtime databases and SQLite sidecars
+*.db
+*.db-shm
+*.db-wal
+
+# Runtime logs
+*.log
+
+# Local editor and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Playwright dependencies and reports
+node_modules/
+playwright-report/
+blob-report/
+playwright/.cache/
+test-results/
+playwright-test.db*
