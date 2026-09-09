@@ -14,4 +14,5 @@ if bashio::var.true "$LOG_MQTT_EVENTS"; then
 else
 	set --
 fi
+bashio::log.info "Starting Meshtastic Monitor for topic ${TOPIC} on ingress port 8099"
 exec meshat-monitor --database /data/meshat-monitor.db --topic "$TOPIC" --retention-days "$RETENTION_DAYS" --http-port 8099 --web-root /usr/local/share/meshat-monitor "$@"
