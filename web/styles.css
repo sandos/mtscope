@@ -27,6 +27,10 @@ code { display: block; max-width: 460px; white-space: pre-wrap; word-break: brea
 .meta { color: #65736c; font-size: 12px; }
 .raw { margin-top: 7px; }
 .raw summary { color: #65736c; cursor: pointer; font-size: 12px; }
+.observations { margin-bottom: 7px; }
+.observations summary { color: #65736c; cursor: pointer; font-size: 12px; }
+.observation { border-top: 1px solid #dce4df; margin-top: 6px; padding-top: 5px; }
+.observation strong { font-size: 12px; }
 .topic summary { color: #65736c; cursor: pointer; font-size: 12px; }
 .topic[open] { min-width: 180px; }
 .topic code { max-width: none; }
