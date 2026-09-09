@@ -23,8 +23,12 @@ Config parse_args(int argc, char** argv) {
     for (int index = 1; index < argc; ++index) {
         const std::string option = argv[index];
         if (option == "--help") {
-            std::cout << "Usage: meshat-monitor [--database PATH] [--web-root PATH] [--topic MQTT_TOPIC] [--retention-days DAYS] [--http-port PORT]\n";
+            std::cout << "Usage: meshat-monitor [--database PATH] [--web-root PATH] [--topic MQTT_TOPIC] [--retention-days DAYS] [--http-port PORT] [--log-mqtt-events]\n";
             std::exit(0);
+        }
+        if (option == "--log-mqtt-events") {
+            config.log_mqtt_events = true;
+            continue;
         }
         if (index + 1 >= argc) throw std::runtime_error("Missing value for " + option);
         const std::string value = argv[++index];

@@ -12,4 +12,5 @@ struct Config {
     std::string web_root = "web";
     int retention_days = 3;
     int http_port = 8099;
+    bool log_mqtt_events = false;
 };
