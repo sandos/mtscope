@@ -91,9 +91,15 @@ function renderPackets() {
 }
 
 function yesNo(value) { return value == null ? '<span class="muted">Unknown</span>' : value ? 'Yes' : 'No'; }
+function mapLink(node) {
+  if (node.latitude == null || node.longitude == null) return '<span class="muted">Unknown</span>';
+  const latitude = encodeURIComponent(node.latitude);
+  const longitude = encodeURIComponent(node.longitude);
+  return `<a href="https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>`;
+}
 function renderNodes() {
   const nodes = visibleItems('nodes');
-  nodeBody.innerHTML = nodes.map(node => `<tr><td><code>${esc(node.node_id)}</code></td><td>${esc(node.long_name) || '<span class="muted">Unnamed</span>'}</td><td>${esc(node.short_name)}</td><td>${esc(node.hardware_model) || '<span class="muted">Unknown</span>'}</td><td>${esc(node.role) || '<span class="muted">Unknown</span>'}</td><td>${yesNo(node.is_licensed)}</td><td>${node.is_unmessagable === null ? '<span class="muted">Unknown</span>' : node.is_unmessagable ? 'Disabled' : 'Enabled'}</td><td>${node.has_public_key ? 'Available' : 'None'}</td><td>${new Date(node.last_seen * 1000).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">No nodeinfo packets received yet</td></tr>';
+  nodeBody.innerHTML = nodes.map(node => `<tr><td><code>${esc(node.node_id)}</code></td><td>${esc(node.long_name) || '<span class="muted">Unnamed</span>'}</td><td>${esc(node.short_name)}</td><td>${esc(node.hardware_model) || '<span class="muted">Unknown</span>'}</td><td>${esc(node.role) || '<span class="muted">Unknown</span>'}</td><td>${yesNo(node.is_licensed)}</td><td>${node.is_unmessagable === null ? '<span class="muted">Unknown</span>' : node.is_unmessagable ? 'Disabled' : 'Enabled'}</td><td>${node.has_public_key ? 'Available' : 'None'}</td><td>${node.latitude == null ? '<span class="muted">Unknown</span>' : esc(node.latitude)}</td><td>${node.longitude == null ? '<span class="muted">Unknown</span>' : esc(node.longitude)}</td><td>${node.altitude == null ? '<span class="muted">Unknown</span>' : `${esc(node.altitude)} m`}</td><td>${mapLink(node)}</td><td>${new Date(node.last_seen * 1000).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="13" class="muted">No nodeinfo packets received yet</td></tr>';
 }
 
 function showTab(name) {

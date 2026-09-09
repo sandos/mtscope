@@ -197,7 +197,7 @@ std::string Database::observations_json(const std::string& packet_key) {
 }
 
 std::string Database::nodes_json() {
-    constexpr const char* sql = "SELECT m.node_id, m.long_name, m.short_name, m.hardware_model, m.role, m.is_licensed, m.is_unmessagable, m.has_public_key, m.received_at FROM measurements m INNER JOIN (SELECT node_id, MAX(received_at) AS last_seen FROM measurements WHERE kind = 'nodeinfo' AND node_id <> '' GROUP BY node_id) latest ON latest.node_id = m.node_id AND latest.last_seen = m.received_at WHERE m.kind = 'nodeinfo' ORDER BY m.received_at DESC LIMIT 500";
+    constexpr const char* sql = "SELECT m.node_id, m.long_name, m.short_name, m.hardware_model, m.role, m.is_licensed, m.is_unmessagable, m.has_public_key, m.received_at, position.latitude, position.longitude, position.altitude FROM measurements m INNER JOIN (SELECT node_id, MAX(received_at) AS last_seen FROM measurements WHERE kind = 'nodeinfo' AND node_id <> '' GROUP BY node_id) latest ON latest.node_id = m.node_id AND latest.last_seen = m.received_at LEFT JOIN (SELECT p.node_id, p.latitude, p.longitude, p.altitude FROM measurements p INNER JOIN (SELECT node_id, MAX(received_at) AS last_seen FROM measurements WHERE kind = 'position' AND node_id <> '' GROUP BY node_id) latest_position ON latest_position.node_id = p.node_id AND latest_position.last_seen = p.received_at WHERE p.kind = 'position') position ON position.node_id = m.node_id WHERE m.kind = 'nodeinfo' ORDER BY m.received_at DESC LIMIT 500";
     std::lock_guard<std::mutex> lock(mutex_);
     sqlite3_stmt* statement = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &statement, nullptr) != SQLITE_OK) return "[]";
@@ -208,7 +208,8 @@ std::string Database::nodes_json() {
         first = false;
         const auto text = [&](int column) { return json_escape(sqlite3_column_text(statement, column), sqlite3_column_bytes(statement, column)); };
         const auto optional_integer = [&](int column) { return sqlite3_column_type(statement, column) == SQLITE_NULL ? std::string("null") : std::to_string(sqlite3_column_int(statement, column)); };
-        result += "{\"node_id\":\"" + text(0) + "\",\"long_name\":\"" + text(1) + "\",\"short_name\":\"" + text(2) + "\",\"hardware_model\":\"" + text(3) + "\",\"role\":\"" + text(4) + "\",\"is_licensed\":" + optional_integer(5) + ",\"is_unmessagable\":" + optional_integer(6) + ",\"has_public_key\":" + std::to_string(sqlite3_column_int(statement, 7)) + ",\"last_seen\":" + std::to_string(sqlite3_column_int64(statement, 8)) + "}";
+        const auto optional_number = [&](int column) { return sqlite3_column_type(statement, column) == SQLITE_NULL ? std::string("null") : std::to_string(sqlite3_column_double(statement, column)); };
+        result += "{\"node_id\":\"" + text(0) + "\",\"long_name\":\"" + text(1) + "\",\"short_name\":\"" + text(2) + "\",\"hardware_model\":\"" + text(3) + "\",\"role\":\"" + text(4) + "\",\"is_licensed\":" + optional_integer(5) + ",\"is_unmessagable\":" + optional_integer(6) + ",\"has_public_key\":" + std::to_string(sqlite3_column_int(statement, 7)) + ",\"last_seen\":" + std::to_string(sqlite3_column_int64(statement, 8)) + ",\"latitude\":" + optional_number(9) + ",\"longitude\":" + optional_number(10) + ",\"altitude\":" + optional_number(11) + "}";
     }
     sqlite3_finalize(statement);
     return result + "]";
