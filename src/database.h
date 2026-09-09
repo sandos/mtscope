@@ -17,14 +17,14 @@ public:
     Database(const Database&) = delete;
     Database& operator=(const Database&) = delete;
 
-    void insert(const std::string& topic, const void* payload, int length);
+    bool insert(const std::string& topic, const void* payload, int length);
     void purge(int retention_days);
     std::string recent_json();
     std::string observations_json(const std::string& packet_key);
     std::string nodes_json();
 
 private:
-    void insert_measurement(std::int64_t logical_packet_id, std::int64_t received_at, const Measurement& measurement);
+    bool insert_measurement(std::int64_t logical_packet_id, std::int64_t received_at, const Measurement& measurement);
     void execute(const char* sql);
     void prepare(const char* sql, sqlite3_stmt** statement);
 

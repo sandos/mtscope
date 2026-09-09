@@ -22,6 +22,7 @@ void Monitor::run() {
     if (!client_) throw std::runtime_error("Unable to create MQTT client");
     mosquitto_username_pw_set(client_, config_.username.c_str(), config_.password.c_str());
     mosquitto_connect_callback_set(client_, on_connect);
+    mosquitto_disconnect_callback_set(client_, on_disconnect);
     mosquitto_message_callback_set(client_, on_message);
     mosquitto_reconnect_delay_set(client_, 1, 60, true);
     if (mosquitto_connect_async(client_, config_.host.c_str(), config_.mqtt_port, 60) != MOSQ_ERR_SUCCESS) {
@@ -33,16 +34,30 @@ void Monitor::run() {
 void Monitor::on_connect(mosquitto* client, void* context, int result) {
     auto* monitor = static_cast<Monitor*>(context);
     if (result != MOSQ_ERR_SUCCESS) {
-        std::cerr << "MQTT connection refused: " << result << "\n";
+        std::cerr << "MQTT connection failed: " << result << " (" << mosquitto_strerror(result) << ")\n";
         return;
     }
-    mosquitto_subscribe(client, nullptr, monitor->config_.topic.c_str(), 0);
+    const int subscribe_result = mosquitto_subscribe(client, nullptr, monitor->config_.topic.c_str(), 0);
+    if (subscribe_result != MOSQ_ERR_SUCCESS) {
+        std::cerr << "MQTT subscription failed: " << subscribe_result << " (" << mosquitto_strerror(subscribe_result) << ")\n";
+        return;
+    }
     std::cerr << "Subscribed to " << monitor->config_.topic << "\n";
+}
+
+void Monitor::on_disconnect(mosquitto*, void*, int result) {
+    if (result != MOSQ_ERR_SUCCESS) {
+        std::cerr << "MQTT disconnected: " << result << " (" << mosquitto_strerror(result) << ")\n";
+    } else {
+        std::cerr << "MQTT disconnected\n";
+    }
 }
 
 void Monitor::on_message(mosquitto*, void* context, const mosquitto_message* message) {
     auto* monitor = static_cast<Monitor*>(context);
     if (message->payload && message->payloadlen > 0) {
-        monitor->database_.insert(message->topic, message->payload, message->payloadlen);
+        if (!monitor->database_.insert(message->topic, message->payload, message->payloadlen)) {
+            std::cerr << "Unable to persist MQTT message from " << message->topic << "\n";
+        }
     }
 }

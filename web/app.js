@@ -7,6 +7,8 @@ const packetFilter = document.querySelector('#packet-filter');
 const nodeFilter = document.querySelector('#node-filter');
 const showStatus = document.querySelector('#show-status');
 const statusColumn = document.querySelector('.node-status-column');
+const connectionStatus = document.querySelector('#connection-status');
+const statusText = document.querySelector('#status-text');
 const tableState = {
   packets: { items: [], filter: '', sortKey: null, descending: false },
   nodes: { items: [], filter: '', sortKey: null, descending: false },
@@ -156,6 +158,9 @@ document.querySelectorAll('th button[data-table]').forEach(button => {
 });
 
 async function load() {
+  connectionStatus.className = 'connection-status pending';
+  connectionStatus.setAttribute('aria-label', 'Refreshing monitor data');
+  connectionStatus.title = 'Refreshing monitor data';
   try {
     const [packets, nodes] = await Promise.all([fetch('/api/packets').then(response => response.json()), fetch('/api/nodes').then(response => response.json())]);
     tableState.packets.items = groupPackets(packets);
@@ -163,9 +168,15 @@ async function load() {
     renderPackets();
     renderNodes();
     updateSortIndicators();
-    status.textContent = `${tableState.packets.items.length} logical packets · ${nodes.length} seen nodes`;
+    statusText.textContent = `${tableState.packets.items.length} logical packets · ${nodes.length} seen nodes`;
+    connectionStatus.className = 'connection-status connected';
+    connectionStatus.setAttribute('aria-label', 'Monitor connected');
+    connectionStatus.title = 'Monitor connected';
   } catch (error) {
-    status.textContent = 'Unable to load monitor data';
+    statusText.textContent = 'Unable to load monitor data';
+    connectionStatus.className = 'connection-status error';
+    connectionStatus.setAttribute('aria-label', 'Monitor connection error');
+    connectionStatus.title = 'Monitor connection error';
   }
 }
 

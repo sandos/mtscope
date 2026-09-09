@@ -17,6 +17,7 @@ public:
 
 private:
     static void on_connect(mosquitto* client, void* context, int result);
+    static void on_disconnect(mosquitto*, void* context, int result);
     static void on_message(mosquitto*, void* context, const struct mosquitto_message* message);
 
     const Config& config_;

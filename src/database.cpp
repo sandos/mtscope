@@ -79,9 +79,20 @@ Database::~Database() {
     sqlite3_close(db_);
 }
 
-void Database::insert(const std::string& topic, const void* payload, int length) {
+bool Database::insert(const std::string& topic, const void* payload, int length) {
     const ParsedPacket parsed = parse_packet(topic, payload, length);
     std::lock_guard<std::mutex> lock(mutex_);
+    char* begin_error = nullptr;
+    if (sqlite3_exec(db_, "BEGIN TRANSACTION;", nullptr, nullptr, &begin_error) != SQLITE_OK) {
+        std::cerr << "SQLite transaction start failed: " << (begin_error ? begin_error : sqlite3_errmsg(db_)) << "\n";
+        sqlite3_free(begin_error);
+        return false;
+    }
+    const auto fail = [this](const char* operation) {
+        std::cerr << "SQLite " << operation << " failed: " << sqlite3_errmsg(db_) << "\n";
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    };
     const auto received_at = now_seconds();
     sqlite3_reset(logical_insert_);
     sqlite3_clear_bindings(logical_insert_);
@@ -96,8 +107,7 @@ void Database::insert(const std::string& topic, const void* payload, int length)
     sqlite3_bind_int64(logical_insert_, 9, received_at);
     sqlite3_bind_int64(logical_insert_, 10, received_at);
     if (sqlite3_step(logical_insert_) != SQLITE_DONE) {
-        std::cerr << "SQLite insert failed: " << sqlite3_errmsg(db_) << "\n";
-        return;
+        return fail("logical packet insert");
     }
     sqlite3_reset(logical_update_);
     sqlite3_clear_bindings(logical_update_);
@@ -105,11 +115,11 @@ void Database::insert(const std::string& topic, const void* payload, int length)
     sqlite3_bind_text(logical_update_, 2, parsed.packet_type.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(logical_update_, 3, parsed.decoded_payload_hex.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(logical_update_, 4, parsed.packet_key.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_step(logical_update_);
+    if (sqlite3_step(logical_update_) != SQLITE_DONE) return fail("logical packet update");
     sqlite3_reset(logical_select_);
     sqlite3_clear_bindings(logical_select_);
     sqlite3_bind_text(logical_select_, 1, parsed.packet_key.c_str(), -1, SQLITE_TRANSIENT);
-    if (sqlite3_step(logical_select_) != SQLITE_ROW) return;
+    if (sqlite3_step(logical_select_) != SQLITE_ROW) return fail("logical packet lookup");
     const auto logical_packet_id = sqlite3_column_int64(logical_select_, 0);
     sqlite3_reset(observation_insert_);
     sqlite3_clear_bindings(observation_insert_);
@@ -129,10 +139,19 @@ void Database::insert(const std::string& topic, const void* payload, int length)
     if (parsed.hop_start) sqlite3_bind_int64(observation_insert_, 14, *parsed.hop_start); else sqlite3_bind_null(observation_insert_, 14);
     sqlite3_bind_int(observation_insert_, 15, parsed.via_mqtt);
     if (sqlite3_step(observation_insert_) != SQLITE_DONE) {
-        std::cerr << "SQLite observation insert failed: " << sqlite3_errmsg(db_) << "\n";
-        return;
+        return fail("observation insert");
     }
-    if (parsed.measurement) insert_measurement(logical_packet_id, received_at, *parsed.measurement);
+    if (parsed.measurement && !insert_measurement(logical_packet_id, received_at, *parsed.measurement)) {
+        return fail("measurement insert");
+    }
+    char* commit_error = nullptr;
+    if (sqlite3_exec(db_, "COMMIT;", nullptr, nullptr, &commit_error) != SQLITE_OK) {
+        std::cerr << "SQLite transaction commit failed: " << (commit_error ? commit_error : sqlite3_errmsg(db_)) << "\n";
+        sqlite3_free(commit_error);
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    }
+    return true;
 }
 
 void Database::purge(int retention_days) {
@@ -215,7 +234,7 @@ std::string Database::nodes_json() {
     return result + "]";
 }
 
-void Database::insert_measurement(std::int64_t logical_packet_id, std::int64_t received_at, const Measurement& measurement) {
+bool Database::insert_measurement(std::int64_t logical_packet_id, std::int64_t received_at, const Measurement& measurement) {
     sqlite3_reset(measurement_insert_);
     sqlite3_clear_bindings(measurement_insert_);
     sqlite3_bind_int64(measurement_insert_, 1, received_at);
@@ -238,7 +257,7 @@ void Database::insert_measurement(std::int64_t logical_packet_id, std::int64_t r
     bind_optional(measurement_insert_, 18, measurement.temperature);
     bind_optional(measurement_insert_, 19, measurement.relative_humidity);
     bind_optional(measurement_insert_, 20, measurement.pressure);
-    if (sqlite3_step(measurement_insert_) != SQLITE_DONE) std::cerr << "SQLite measurement insert failed: " << sqlite3_errmsg(db_) << "\n";
+    return sqlite3_step(measurement_insert_) == SQLITE_DONE;
 }
 
 void Database::execute(const char* sql) {
