@@ -201,7 +201,7 @@ async function load() {
   connectionStatus.setAttribute('aria-label', 'Refreshing monitor data');
   connectionStatus.title = 'Refreshing monitor data';
   try {
-    const [packets, nodes, monitorStatus] = await Promise.all([fetch('/api/packets').then(response => response.json()), fetch('/api/nodes').then(response => response.json()), fetch('/api/status').then(response => response.json())]);
+    const [packets, nodes, monitorStatus] = await Promise.all([fetch('api/packets').then(response => response.json()), fetch('api/nodes').then(response => response.json()), fetch('api/status').then(response => response.json())]);
     tableState.packets.items = groupPackets(packets);
     tableState.nodes.items = nodes;
     renderPackets();
