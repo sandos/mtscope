@@ -80,7 +80,7 @@ Database::~Database() {
 }
 
 bool Database::insert(const std::string& topic, const void* payload, int length) {
-    const ParsedPacket parsed = parse_packet(topic, payload, length);
+    ParsedPacket parsed = parse_packet(topic, payload, length);
     std::lock_guard<std::mutex> lock(mutex_);
     char* begin_error = nullptr;
     if (sqlite3_exec(db_, "BEGIN TRANSACTION;", nullptr, nullptr, &begin_error) != SQLITE_OK) {
@@ -94,6 +94,9 @@ bool Database::insert(const std::string& topic, const void* payload, int length)
         return false;
     };
     const auto received_at = now_seconds();
+    if (!parsed.mesh_packet_id) {
+        parsed.packet_key += ":" + std::to_string(received_at) + ":" + std::to_string(++fallback_packet_sequence_);
+    }
     sqlite3_reset(logical_insert_);
     sqlite3_clear_bindings(logical_insert_);
     sqlite3_bind_text(logical_insert_, 1, parsed.packet_key.c_str(), -1, SQLITE_TRANSIENT);

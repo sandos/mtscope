@@ -37,5 +37,6 @@ private:
     sqlite3_stmt* purge_observations_ = nullptr;
     sqlite3_stmt* measurement_purge_ = nullptr;
     sqlite3_stmt* logical_purge_ = nullptr;
+    std::uint64_t fallback_packet_sequence_ = 0;
     std::mutex mutex_;
 };
