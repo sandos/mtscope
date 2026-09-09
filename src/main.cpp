@@ -58,8 +58,14 @@ int main(int argc, char** argv) {
         database.purge(config.retention_days);
         HttpServer web_server(config.http_port, config.web_root);
         Monitor monitor(config, database);
-        monitor.run();
         std::thread web([&] { web_server.serve(database, monitor); });
+        try {
+            monitor.run();
+        } catch (...) {
+            running = 0;
+            web.join();
+            throw;
+        }
         auto next_purge = std::chrono::steady_clock::now() + std::chrono::hours(1);
         while (running) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
