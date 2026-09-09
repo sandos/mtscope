@@ -44,6 +44,22 @@ test('keeps the dashboard usable on mobile', async ({ page }) => {
   expect(bodyWidth).toBeLessThanOrEqual(viewport.width);
 });
 
+test('supports keyboard navigation and filtering shortcuts', async ({ page }) => {
+  await page.goto('/');
+
+  await page.keyboard.press('2');
+  await expect(page.locator('#nodes-panel')).toBeVisible();
+  await page.keyboard.press('/');
+  await expect(page.getByLabel('Filter nodes')).toBeFocused();
+
+  await page.keyboard.type('sensor');
+  await page.keyboard.press('Escape');
+  await expect(page.getByLabel('Filter nodes')).toHaveValue('');
+
+  await page.keyboard.press('1');
+  await expect(page.locator('#packets-panel')).toBeVisible();
+});
+
 test('keeps node coordinate columns balanced when status is hidden', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Nodes' }).click();

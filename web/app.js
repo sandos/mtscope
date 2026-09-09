@@ -172,6 +172,30 @@ document.querySelectorAll('th button[data-table]').forEach(button => {
   });
 });
 
+document.addEventListener('keydown', event => {
+  const target = event.target;
+  const isEditing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target.isContentEditable;
+  if (isEditing && event.key !== 'Escape') return;
+  if (event.key === '1') {
+    event.preventDefault();
+    showTab('packets');
+  } else if (event.key === '2') {
+    event.preventDefault();
+    showTab('nodes');
+  } else if (event.key === '/') {
+    event.preventDefault();
+    (packetPanel.hidden ? nodeFilter : packetFilter).focus();
+  } else if (event.key.toLowerCase() === 'r') {
+    event.preventDefault();
+    load();
+  } else if (event.key === 'Escape') {
+    const filter = packetPanel.hidden ? nodeFilter : packetFilter;
+    filter.value = '';
+    filter.dispatchEvent(new Event('input'));
+    filter.blur();
+  }
+});
+
 async function load() {
   connectionStatus.className = 'connection-status pending';
   connectionStatus.setAttribute('aria-label', 'Refreshing monitor data');
