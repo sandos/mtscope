@@ -24,7 +24,6 @@ public:
 
 private:
     void insert_measurement(std::int64_t packet_id, const Measurement& measurement);
-    void add_column(const char* table, const char* name, const char* definition = "TEXT NOT NULL DEFAULT ''");
     void execute(const char* sql);
     void prepare(const char* sql, sqlite3_stmt** statement);
 

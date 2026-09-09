@@ -37,6 +37,8 @@ struct ParsedPacket {
     std::string node;
     std::string packet_type;
     std::string sender;
+    std::string observer;
+    std::string content_hash;
     std::string decoded_payload_hex;
     std::optional<Measurement> measurement;
 };

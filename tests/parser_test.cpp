@@ -42,6 +42,7 @@ TEST(ParserTest, ParsesJsonTelemetryMeasurements) {
 
 TEST(ParserTest, ParsesDecodedProtobufText) {
     meshtastic::ServiceEnvelope envelope;
+    envelope.set_gateway_id("!observer01");
     auto* mesh_packet = envelope.mutable_packet();
     mesh_packet->set_from(0x12345678);
     mesh_packet->set_id(0x01020304);
@@ -53,10 +54,31 @@ TEST(ParserTest, ParsesDecodedProtobufText) {
     const ParsedPacket packet = parse_packet("msh/SE/2/e/LongFast", payload.data(), static_cast<int>(payload.size()));
 
     EXPECT_EQ(packet.sender, "!12345678");
+    EXPECT_EQ(packet.observer, "!observer01");
+    EXPECT_FALSE(packet.content_hash.empty());
     EXPECT_EQ(packet.packet_type, "TEXT_MESSAGE_APP");
     ASSERT_TRUE(packet.measurement.has_value());
     EXPECT_EQ(packet.measurement->kind, "text");
     EXPECT_EQ(packet.measurement->text, "protobuf hello");
+}
+
+TEST(ParserTest, HashesInnerPacketIndependentlyOfObserver) {
+    meshtastic::ServiceEnvelope first;
+    first.set_gateway_id("!observer01");
+    first.mutable_packet()->set_from(0x12345678);
+    first.mutable_packet()->set_id(0x01020304);
+    first.mutable_packet()->set_to(0x87654321);
+
+    meshtastic::ServiceEnvelope second = first;
+    second.set_gateway_id("!observer02");
+
+    const std::string first_payload = first.SerializeAsString();
+    const std::string second_payload = second.SerializeAsString();
+    const ParsedPacket first_packet = parse_packet("msh/SE/2/e/LongFast", first_payload.data(), static_cast<int>(first_payload.size()));
+    const ParsedPacket second_packet = parse_packet("msh/SE/2/e/LongFast", second_payload.data(), static_cast<int>(second_payload.size()));
+
+    EXPECT_NE(first_packet.observer, second_packet.observer);
+    EXPECT_EQ(first_packet.content_hash, second_packet.content_hash);
 }
 
 #ifdef MTSCOPE_HAVE_OPENSSL

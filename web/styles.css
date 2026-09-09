@@ -13,7 +13,7 @@ table { width: 100%; table-layout: fixed; border-collapse: collapse; background:
 .topic-column { width: 48px; }
 .region-column { width: 56px; }
 .channel-column { width: 76px; }
-.node-column, .sender-column { width: 88px; }
+.node-column, .sender-column, .observer-column { width: 88px; }
 .packet-column { width: 180px; }
 .details-column { width: 38%; }
 th, td { padding: 10px; text-align: left; border-bottom: 1px solid #dce4df; vertical-align: top; }
@@ -34,7 +34,7 @@ code { display: block; max-width: 460px; white-space: pre-wrap; word-break: brea
 @media (max-width: 1050px) { main { padding: 18px 10px; } .topic-cell, .topic-column { display: none; } }
 @media (max-width: 760px) { td, th { padding: 7px; } .detail { min-width: 150px; } }
 @media (max-width: 560px) {
-	.received-column, .channel-column, .node-column, .packet-column, .sender-column, .details-column { width: auto; }
+	.received-column, .channel-column, .node-column, .packet-column, .sender-column, .observer-column, .details-column { width: auto; }
 	th:nth-child(3), td:nth-child(3), th:nth-child(5), td:nth-child(5) { display: none; }
 }
 @media (max-width: 560px) { .filter input { box-sizing: border-box; display: block; margin: 6px 0 0; max-width: none; width: 100%; } }

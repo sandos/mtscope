@@ -7,6 +7,7 @@ test('shows the empty monitor dashboard', async ({ page, request }) => {
   await expect(page.getByRole('heading', { name: 'Meshtastic Monitor' })).toBeVisible();
   await expect(page.getByText('0 recent packets · 0 seen nodes')).toBeVisible();
   await expect(page.getByRole('columnheader', { name: 'Details' })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Observer' })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Nodes' })).toBeVisible();
   await expect(page.getByLabel('Filter packets')).toBeVisible();
   const receivedHeader = page.getByRole('button', { name: /Received/ });

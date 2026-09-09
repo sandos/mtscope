@@ -44,10 +44,7 @@ Database::Database(const std::string& path) {
         "id INTEGER PRIMARY KEY, received_at INTEGER NOT NULL, topic TEXT NOT NULL, payload BLOB NOT NULL, "
         "region TEXT NOT NULL DEFAULT '', transport TEXT NOT NULL DEFAULT '', encoding TEXT NOT NULL DEFAULT '', "
         "channel TEXT NOT NULL DEFAULT '', node TEXT NOT NULL DEFAULT '', packet_type TEXT NOT NULL DEFAULT '', "
-        "sender TEXT NOT NULL DEFAULT '', decoded_payload_hex TEXT NOT NULL DEFAULT '');");
-    for (const char* column : {"region", "transport", "encoding", "channel", "node", "packet_type", "sender", "decoded_payload_hex"}) {
-        add_column("packets", column);
-    }
+        "sender TEXT NOT NULL DEFAULT '', observer TEXT NOT NULL DEFAULT '', content_hash TEXT NOT NULL DEFAULT '', decoded_payload_hex TEXT NOT NULL DEFAULT '');");
     execute("CREATE INDEX IF NOT EXISTS packets_received_at ON packets(received_at);");
     execute("CREATE TABLE IF NOT EXISTS measurements ("
         "id INTEGER PRIMARY KEY, packet_id INTEGER NOT NULL, received_at INTEGER NOT NULL, kind TEXT NOT NULL, "
@@ -55,13 +52,8 @@ Database::Database(const std::string& path) {
         "hardware_model TEXT NOT NULL DEFAULT '', role TEXT NOT NULL DEFAULT '', is_licensed INTEGER, is_unmessagable INTEGER, has_public_key INTEGER NOT NULL DEFAULT 0, "
         "text TEXT NOT NULL DEFAULT '', latitude REAL, longitude REAL, altitude REAL, battery_level REAL, "
         "voltage REAL, temperature REAL, relative_humidity REAL, pressure REAL);");
-    add_column("measurements", "hardware_model");
-    add_column("measurements", "role");
-    add_column("measurements", "is_licensed", "INTEGER");
-    add_column("measurements", "is_unmessagable", "INTEGER");
-    add_column("measurements", "has_public_key", "INTEGER NOT NULL DEFAULT 0");
     execute("CREATE INDEX IF NOT EXISTS measurements_received_at ON measurements(received_at);");
-    prepare("INSERT INTO packets(received_at, topic, payload, region, transport, encoding, channel, node, packet_type, sender, decoded_payload_hex) VALUES(?,?,?,?,?,?,?,?,?,?,?)", &insert_);
+    prepare("INSERT INTO packets(received_at, topic, payload, region, transport, encoding, channel, node, packet_type, sender, observer, content_hash, decoded_payload_hex) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", &insert_);
     prepare("INSERT INTO measurements(received_at, packet_id, kind, node_id, long_name, short_name, hardware_model, role, is_licensed, is_unmessagable, has_public_key, text, latitude, longitude, altitude, battery_level, voltage, temperature, relative_humidity, pressure) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", &measurement_insert_);
     prepare("DELETE FROM packets WHERE received_at < ?", &purge_);
     prepare("DELETE FROM measurements WHERE received_at < ?", &measurement_purge_);
@@ -90,7 +82,9 @@ void Database::insert(const std::string& topic, const void* payload, int length)
     sqlite3_bind_text(insert_, 8, parsed.node.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(insert_, 9, parsed.packet_type.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(insert_, 10, parsed.sender.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 11, parsed.decoded_payload_hex.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insert_, 11, parsed.observer.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insert_, 12, parsed.content_hash.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insert_, 13, parsed.decoded_payload_hex.c_str(), -1, SQLITE_TRANSIENT);
     if (sqlite3_step(insert_) != SQLITE_DONE) {
         std::cerr << "SQLite insert failed: " << sqlite3_errmsg(db_) << "\n";
         return;
@@ -112,7 +106,7 @@ void Database::purge(int retention_days) {
 }
 
 std::string Database::recent_json() {
-    constexpr const char* sql = "SELECT p.received_at, p.topic, p.payload, p.region, p.transport, p.encoding, p.channel, p.node, p.packet_type, p.sender, p.decoded_payload_hex, m.kind, m.node_id, m.long_name, m.short_name, m.hardware_model, m.role, m.is_licensed, m.is_unmessagable, m.has_public_key, m.text, m.latitude, m.longitude, m.altitude, m.battery_level, m.voltage, m.temperature, m.relative_humidity, m.pressure FROM packets p LEFT JOIN measurements m ON m.packet_id = p.id ORDER BY p.id DESC LIMIT 500";
+    constexpr const char* sql = "SELECT p.received_at, p.topic, p.payload, p.region, p.transport, p.encoding, p.channel, p.node, p.packet_type, p.sender, p.observer, p.content_hash, p.decoded_payload_hex, m.kind, m.node_id, m.long_name, m.short_name, m.hardware_model, m.role, m.is_licensed, m.is_unmessagable, m.has_public_key, m.text, m.latitude, m.longitude, m.altitude, m.battery_level, m.voltage, m.temperature, m.relative_humidity, m.pressure FROM packets p LEFT JOIN measurements m ON m.packet_id = p.id ORDER BY p.id DESC LIMIT 500";
     std::lock_guard<std::mutex> lock(mutex_);
     sqlite3_stmt* statement = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &statement, nullptr) != SQLITE_OK) return "[]";
@@ -125,9 +119,9 @@ std::string Database::recent_json() {
         const auto number = [&](int column) { return sqlite3_column_type(statement, column) == SQLITE_NULL ? std::string("null") : std::to_string(sqlite3_column_double(statement, column)); };
         result += "{\"received_at\":" + std::to_string(sqlite3_column_int64(statement, 0));
         result += ",\"topic\":\"" + text(1) + "\",\"payload_hex\":\"" + hex_encode(sqlite3_column_blob(statement, 2), sqlite3_column_bytes(statement, 2)) + "\"";
-        result += ",\"region\":\"" + text(3) + "\",\"transport\":\"" + text(4) + "\",\"encoding\":\"" + text(5) + "\",\"channel\":\"" + text(6) + "\",\"node\":\"" + text(7) + "\",\"packet_type\":\"" + text(8) + "\",\"sender\":\"" + text(9) + "\",\"decoded_payload_hex\":\"" + text(10) + "\"";
-        if (sqlite3_column_type(statement, 11) != SQLITE_NULL) {
-            result += ",\"measurement\":{\"kind\":\"" + text(11) + "\",\"node_id\":\"" + text(12) + "\",\"long_name\":\"" + text(13) + "\",\"short_name\":\"" + text(14) + "\",\"hardware_model\":\"" + text(15) + "\",\"role\":\"" + text(16) + "\",\"is_licensed\":" + number(17) + ",\"is_unmessagable\":" + number(18) + ",\"has_public_key\":" + number(19) + ",\"text\":\"" + text(20) + "\",\"latitude\":" + number(21) + ",\"longitude\":" + number(22) + ",\"altitude\":" + number(23) + ",\"battery_level\":" + number(24) + ",\"voltage\":" + number(25) + ",\"temperature\":" + number(26) + ",\"relative_humidity\":" + number(27) + ",\"pressure\":" + number(28) + "}";
+        result += ",\"region\":\"" + text(3) + "\",\"transport\":\"" + text(4) + "\",\"encoding\":\"" + text(5) + "\",\"channel\":\"" + text(6) + "\",\"node\":\"" + text(7) + "\",\"packet_type\":\"" + text(8) + "\",\"sender\":\"" + text(9) + "\",\"observer\":\"" + text(10) + "\",\"content_hash\":\"" + text(11) + "\",\"decoded_payload_hex\":\"" + text(12) + "\"";
+        if (sqlite3_column_type(statement, 13) != SQLITE_NULL) {
+            result += ",\"measurement\":{\"kind\":\"" + text(13) + "\",\"node_id\":\"" + text(14) + "\",\"long_name\":\"" + text(15) + "\",\"short_name\":\"" + text(16) + "\",\"hardware_model\":\"" + text(17) + "\",\"role\":\"" + text(18) + "\",\"is_licensed\":" + number(19) + ",\"is_unmessagable\":" + number(20) + ",\"has_public_key\":" + number(21) + ",\"text\":\"" + text(22) + "\",\"latitude\":" + number(23) + ",\"longitude\":" + number(24) + ",\"altitude\":" + number(25) + ",\"battery_level\":" + number(26) + ",\"voltage\":" + number(27) + ",\"temperature\":" + number(28) + ",\"relative_humidity\":" + number(29) + ",\"pressure\":" + number(30) + "}";
         }
         result += "}";
     }
@@ -177,16 +171,6 @@ void Database::insert_measurement(std::int64_t packet_id, const Measurement& mea
     bind_optional(measurement_insert_, 19, measurement.relative_humidity);
     bind_optional(measurement_insert_, 20, measurement.pressure);
     if (sqlite3_step(measurement_insert_) != SQLITE_DONE) std::cerr << "SQLite measurement insert failed: " << sqlite3_errmsg(db_) << "\n";
-}
-
-void Database::add_column(const char* table, const char* name, const char* definition) {
-    const std::string sql = std::string("ALTER TABLE ") + table + " ADD COLUMN " + name + " " + definition;
-    char* error = nullptr;
-    if (sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &error) != SQLITE_OK) {
-        const std::string message = error ? error : "unknown SQLite error";
-        sqlite3_free(error);
-        if (message.find("duplicate column name") == std::string::npos) throw std::runtime_error(message);
-    }
 }
 
 void Database::execute(const char* sql) {

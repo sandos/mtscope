@@ -19,6 +19,17 @@ std::string node_id(std::uint32_t value) {
     return buffer;
 }
 
+std::string content_hash(const std::string& value) {
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const unsigned char character : value) {
+        hash ^= character;
+        hash *= 1099511628211ull;
+    }
+    char output[17];
+    std::snprintf(output, sizeof(output), "%016llx", static_cast<unsigned long long>(hash));
+    return output;
+}
+
 std::vector<std::string> split_topic(const std::string& topic) {
     std::vector<std::string> parts;
     size_t start = 0;
@@ -189,6 +200,9 @@ ParsedPacket parse_packet(const std::string& topic, const void* payload, int len
         if (packet.packet_type.empty()) packet.packet_type = json_field(json, "$typeName");
         if (packet.packet_type.empty() && !json_field(json, "text").empty()) packet.packet_type = "text";
         packet.sender = json_field(json, "sender");
+        packet.observer = json_field(json, "gatewayId");
+        if (packet.observer.empty()) packet.observer = json_field(json, "gateway_id");
+        packet.content_hash = content_hash(json);
         if (packet.channel.empty()) packet.channel = json_field(json, "channel");
         Measurement measurement;
         if (packet.packet_type == "text") {
@@ -223,6 +237,8 @@ ParsedPacket parse_packet(const std::string& topic, const void* payload, int len
         if (envelope.ParseFromArray(payload, length) && envelope.has_packet()) {
             const auto& mesh_packet = envelope.packet();
             packet.sender = node_id(mesh_packet.from());
+            packet.observer = envelope.gateway_id();
+            packet.content_hash = content_hash(mesh_packet.SerializeAsString());
             if (mesh_packet.has_decoded()) {
                 decode_data(packet, mesh_packet.decoded());
             } else if (mesh_packet.has_encrypted()) {

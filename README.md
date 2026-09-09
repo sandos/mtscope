@@ -17,6 +17,14 @@ Open `http://localhost:8099`. Use `--topic` to narrow the subscription, for exam
 
 The same local defaults are available through `./run_local.sh`. It uses `meshat-monitor.db` beside the script and supports `MTSCOPE_DATABASE`, `MTSCOPE_TOPIC`, `MTSCOPE_RETENTION_DAYS`, `MTSCOPE_HTTP_PORT`, and `MTSCOPE_WEB_ROOT` environment overrides. Extra command-line options are passed to the monitor.
 
+The SQLite schema is intentionally fresh-install-only and is not migrated. When upgrading across schema changes, stop the monitor and remove the database before restarting:
+
+```sh
+rm -f meshat-monitor.db meshat-monitor.db-shm meshat-monitor.db-wal
+```
+
+This discards retained packet history and starts with the current schema.
+
 ## Browser tests
 
 The dashboard has Playwright end-to-end tests. Install a native Linux Node.js installation (or use WSL2; WSL1 and Windows `npm` paths are not supported), then run:
