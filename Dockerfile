@@ -1,5 +1,5 @@
 ARG BUILD_ARCH=amd64
-FROM ghcr.io/home-assistant/${BUILD_ARCH}-base:3.21 AS build
+FROM ghcr.io/home-assistant/base:latest AS build
 ARG MESHTASTIC_PROTOBUF_REF=a9e83e98b8d79e757f2985bfbcb4d00c7f630157
 RUN apk add --no-cache build-base cmake git mosquitto-dev sqlite-dev protobuf protobuf-dev openssl-dev
 WORKDIR /build
@@ -9,7 +9,7 @@ RUN git clone https://github.com/meshtastic/protobufs.git protobufs \
 	&& cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMESHTASTIC_PROTOBUF_DIR=/build/protobufs \
 	&& cmake --build build -j"$(nproc)"
 
-FROM ghcr.io/home-assistant/${BUILD_ARCH}-base:3.21
+FROM ghcr.io/home-assistant/base:latest
 RUN apk add --no-cache libmosquitto sqlite-libs openssl
 COPY --from=build /build/build/meshat-monitor /usr/local/bin/meshat-monitor
 COPY web /usr/local/share/meshat-monitor

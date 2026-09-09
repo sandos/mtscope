@@ -5,11 +5,11 @@ version: "0.1.0"
 arch:
   - aarch64
   - amd64
-  - armv7
 ports:
   8099/tcp: 8099
 ports_description:
   8099/tcp: Meshat Monitor dashboard
+webui: http://[HOST]:[PORT:8099]
 options:
   topic: "msh/#"
   retention_days: 3
