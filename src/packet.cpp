@@ -117,6 +117,22 @@ bool decode_data(ParsedPacket& packet, const meshtastic::Data& data) {
         if (position.has_longitude_i()) measurement.longitude = position.longitude_i() * 1e-7;
         if (position.has_altitude()) measurement.altitude = position.altitude();
         packet.measurement = measurement;
+    } else if (data.portnum() == meshtastic::MAP_REPORT_APP) {
+        meshtastic::MapReport map_report;
+        if (!map_report.ParseFromString(data_payload)) return false;
+        Measurement measurement;
+        measurement.kind = "map_report";
+        measurement.node_id = packet.sender;
+        measurement.long_name = map_report.long_name();
+        measurement.short_name = map_report.short_name();
+        measurement.hardware_model = meshtastic::HardwareModel_Name(map_report.hw_model());
+        measurement.role = meshtastic::Config_DeviceConfig_Role_Name(map_report.role());
+        if (map_report.has_opted_report_location()) {
+            measurement.latitude = map_report.latitude_i() * 1e-7;
+            measurement.longitude = map_report.longitude_i() * 1e-7;
+            measurement.altitude = map_report.altitude();
+        }
+        packet.measurement = measurement;
     } else if (data.portnum() == meshtastic::NODEINFO_APP) {
         meshtastic::User user;
         if (!user.ParseFromString(data_payload)) return false;

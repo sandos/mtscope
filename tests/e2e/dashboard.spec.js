@@ -42,3 +42,21 @@ test('keeps the dashboard usable on mobile', async ({ page }) => {
   const bodyWidth = await page.locator('body').evaluate((element) => element.scrollWidth);
   expect(bodyWidth).toBeLessThanOrEqual(viewport.width);
 });
+
+test('keeps node coordinate columns balanced when status is hidden', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Nodes' }).click();
+
+  const nodesTable = page.locator('#nodes-panel table');
+  const latitudeColumn = nodesTable.locator('col.node-latitude-column');
+  const longitudeColumn = nodesTable.locator('col.node-longitude-column');
+  const statusColumn = nodesTable.locator('col.node-status-column');
+  const widths = await Promise.all([latitudeColumn, longitudeColumn, statusColumn].map(column => column.evaluate(element => element.getBoundingClientRect().width)));
+
+  expect(Math.abs(widths[0] - widths[1])).toBeLessThanOrEqual(1);
+  expect(widths[2]).toBe(0);
+
+  await page.getByLabel('Show node status').check();
+  await expect(nodesTable.locator('th[data-column="status"]')).toBeVisible();
+  await expect.poll(() => statusColumn.evaluate(element => element.getBoundingClientRect().width)).toBeGreaterThan(0);
+});

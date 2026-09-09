@@ -5,6 +5,8 @@ const packetPanel = document.querySelector('#packets-panel');
 const nodePanel = document.querySelector('#nodes-panel');
 const packetFilter = document.querySelector('#packet-filter');
 const nodeFilter = document.querySelector('#node-filter');
+const showStatus = document.querySelector('#show-status');
+const statusColumn = document.querySelector('.node-status-column');
 const tableState = {
   packets: { items: [], filter: '', sortKey: null, descending: false },
   nodes: { items: [], filter: '', sortKey: null, descending: false },
@@ -90,16 +92,23 @@ function renderPackets() {
   packetBody.innerHTML = packets.map(packet => `<tr><td>${new Date(packet.received_at * 1000).toLocaleString()}</td><td class="topic-cell"><details class="topic"><summary>View</summary><code>${esc(packet.topic)}</code><span class="meta">${esc(packet.transport)} / ${esc(packet.encoding)}</span></details></td><td>${esc(packet.region)}</td><td>${esc(packet.channel)}</td><td>${esc(packet.node)}</td><td><strong>${esc(packet.packet_type) || '<span class="muted">binary</span>'}</strong></td><td>${nodeLabel(packet.sender, packet.sender_name)}</td><td>${nodeLabel(packet.observer, packet.observer_name)}</td><td class="detail">${details(packet)}<details class="raw"><summary>Raw payload</summary><code>${esc(packet.decoded_payload_hex || packet.payload_hex)}</code></details></td></tr>`).join('');
 }
 
-function yesNo(value) { return value == null ? '<span class="muted">Unknown</span>' : value ? 'Yes' : 'No'; }
+function yesNo(value) { return value == null ? missing() : value ? 'Yes' : 'No'; }
+function missing() { return '<span class="muted">--</span>'; }
+function coordinate(value) { return value == null ? missing() : esc(Number(value).toFixed(5)); }
+function altitude(value) { return value == null ? missing() : `${esc(Number(value).toFixed(0))} m`; }
+function nodeStatus(node) {
+  const messaging = node.is_unmessagable === null ? missing() : node.is_unmessagable ? 'Disabled' : 'Enabled';
+  return `<span>Licensed: ${yesNo(node.is_licensed)}</span><span>PKI: ${node.has_public_key ? 'Available' : 'None'}</span><span>Messaging: ${messaging}</span>`;
+}
 function mapLink(node) {
-  if (node.latitude == null || node.longitude == null) return '<span class="muted">Unknown</span>';
+  if (node.latitude == null || node.longitude == null) return missing();
   const latitude = encodeURIComponent(node.latitude);
   const longitude = encodeURIComponent(node.longitude);
-  return `<a href="https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>`;
+  return `<a href="https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}" target="_blank" rel="noopener noreferrer">OSM</a>`;
 }
 function renderNodes() {
   const nodes = visibleItems('nodes');
-  nodeBody.innerHTML = nodes.map(node => `<tr><td><code>${esc(node.node_id)}</code></td><td>${esc(node.long_name) || '<span class="muted">Unnamed</span>'}</td><td>${esc(node.short_name)}</td><td>${esc(node.hardware_model) || '<span class="muted">Unknown</span>'}</td><td>${esc(node.role) || '<span class="muted">Unknown</span>'}</td><td>${yesNo(node.is_licensed)}</td><td>${node.is_unmessagable === null ? '<span class="muted">Unknown</span>' : node.is_unmessagable ? 'Disabled' : 'Enabled'}</td><td>${node.has_public_key ? 'Available' : 'None'}</td><td>${node.latitude == null ? '<span class="muted">Unknown</span>' : esc(node.latitude)}</td><td>${node.longitude == null ? '<span class="muted">Unknown</span>' : esc(node.longitude)}</td><td>${node.altitude == null ? '<span class="muted">Unknown</span>' : `${esc(node.altitude)} m`}</td><td>${mapLink(node)}</td><td>${new Date(node.last_seen * 1000).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="13" class="muted">No nodeinfo packets received yet</td></tr>';
+  nodeBody.innerHTML = nodes.map(node => `<tr><td><code>${esc(node.node_id)}</code></td><td>${esc(node.long_name) || missing()}</td><td>${esc(node.short_name)}</td><td class="node-hardware">${esc(node.hardware_model) || missing()}</td><td>${esc(node.role) || missing()}</td><td class="node-status" data-column="status"${showStatus.checked ? '' : ' hidden'}>${nodeStatus(node)}</td><td class="node-latitude">${coordinate(node.latitude)}</td><td class="node-longitude">${coordinate(node.longitude)}</td><td class="node-altitude">${altitude(node.altitude)}</td><td class="node-map">${mapLink(node)}</td><td>${new Date(node.last_seen * 1000).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="11" class="muted">No nodeinfo packets received yet</td></tr>';
 }
 
 function showTab(name) {
@@ -123,6 +132,11 @@ packetBody.addEventListener('click', event => {
 });
 packetFilter.addEventListener('input', () => { tableState.packets.filter = packetFilter.value.trim(); renderPackets(); });
 nodeFilter.addEventListener('input', () => { tableState.nodes.filter = nodeFilter.value.trim(); renderNodes(); });
+showStatus.addEventListener('change', () => {
+  statusColumn.classList.toggle('visible', showStatus.checked);
+  document.querySelector('th[data-column="status"]').hidden = !showStatus.checked;
+  renderNodes();
+});
 document.querySelectorAll('th button[data-table]').forEach(button => {
   button.addEventListener('click', () => {
     const state = tableState[button.dataset.table];

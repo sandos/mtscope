@@ -6,6 +6,9 @@ nav { display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid #cb
 button { border: 0; border-bottom: 3px solid transparent; background: transparent; color: #52605a; cursor: pointer; font: inherit; padding: 9px 14px; }
 button[aria-selected=true] { border-bottom-color: #28704f; color: #17221e; font-weight: bold; }
 .filter { display: block; color: #52605a; margin: 0 0 12px; }
+.filter-option { display: block; color: #52605a; margin: 0 0 12px; }
+.filter-option input { margin-right: 6px; }
+.node-status span { display: block; margin: 2px 0; }
 .filter input { margin-left: 8px; max-width: 340px; padding: 6px 8px; border: 1px solid #cbd8d0; border-radius: 3px; font: inherit; }
 section[hidden] { display: none; }
 table { width: 100%; table-layout: fixed; border-collapse: collapse; background: #fff; }
@@ -16,6 +19,20 @@ table { width: 100%; table-layout: fixed; border-collapse: collapse; background:
 .node-column, .sender-column, .observer-column { width: 88px; }
 .packet-column { width: 180px; }
 .details-column { width: 38%; }
+.node-id-column { width: 8%; }
+.node-long-name-column { width: 19%; }
+.node-short-name-column { width: 5%; }
+.node-hardware-column { width: 13%; }
+.node-role-column { width: 7%; }
+.node-status-column { display: none; width: 12%; }
+.node-status-column.visible { display: table-column; }
+.node-latitude-column { width: 5.5%; }
+.node-longitude-column { width: 5.5%; }
+.node-altitude-column { width: 5%; }
+.node-map-column { width: 10%; }
+.node-last-seen-column { width: 10%; }
+.node-hardware { overflow-wrap: anywhere; }
+.node-latitude, .node-longitude, .node-altitude, .node-map { white-space: nowrap; }
 th, td { padding: 10px; text-align: left; border-bottom: 1px solid #dce4df; vertical-align: top; }
 th { background: #e2ebe5; font-size: 12px; }
 th button { color: inherit; font-size: inherit; font-weight: bold; max-width: 100%; padding: 0; text-align: left; white-space: normal; }

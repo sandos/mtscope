@@ -62,6 +62,34 @@ TEST(ParserTest, ParsesDecodedProtobufText) {
     EXPECT_EQ(packet.measurement->text, "protobuf hello");
 }
 
+TEST(ParserTest, ParsesDecodedMapReport) {
+    meshtastic::ServiceEnvelope envelope;
+    auto* mesh_packet = envelope.mutable_packet();
+    mesh_packet->set_from(0x12345678);
+    auto* data = mesh_packet->mutable_decoded();
+    data->set_portnum(meshtastic::MAP_REPORT_APP);
+    meshtastic::MapReport map_report;
+    map_report.set_long_name("Map node");
+    map_report.set_short_name("MN");
+    map_report.set_latitude_i(515000000);
+    map_report.set_longitude_i(-120000000);
+    map_report.set_altitude(125);
+    map_report.set_has_opted_report_location(true);
+    data->set_payload(map_report.SerializeAsString());
+
+    const std::string payload = envelope.SerializeAsString();
+    const ParsedPacket packet = parse_packet("msh/SE/2/e/LongFast", payload.data(), static_cast<int>(payload.size()));
+
+    EXPECT_EQ(packet.packet_type, "MAP_REPORT_APP");
+    ASSERT_TRUE(packet.measurement.has_value());
+    EXPECT_EQ(packet.measurement->kind, "map_report");
+    EXPECT_EQ(packet.measurement->long_name, "Map node");
+    EXPECT_EQ(packet.measurement->short_name, "MN");
+    EXPECT_DOUBLE_EQ(*packet.measurement->latitude, 51.5);
+    EXPECT_DOUBLE_EQ(*packet.measurement->longitude, -12.0);
+    EXPECT_DOUBLE_EQ(*packet.measurement->altitude, 125.0);
+}
+
 TEST(ParserTest, HashesInnerPacketIndependentlyOfObserver) {
     meshtastic::ServiceEnvelope first;
     first.set_gateway_id("!observer01");
