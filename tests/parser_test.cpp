@@ -55,7 +55,7 @@ TEST(ParserTest, ParsesDecodedProtobufText) {
 
     EXPECT_EQ(packet.sender, "!12345678");
     EXPECT_EQ(packet.observer, "!observer01");
-    EXPECT_FALSE(packet.content_hash.empty());
+    EXPECT_FALSE(packet.packet_key.empty());
     EXPECT_EQ(packet.packet_type, "TEXT_MESSAGE_APP");
     ASSERT_TRUE(packet.measurement.has_value());
     EXPECT_EQ(packet.measurement->kind, "text");
@@ -78,7 +78,30 @@ TEST(ParserTest, HashesInnerPacketIndependentlyOfObserver) {
     const ParsedPacket second_packet = parse_packet("msh/SE/2/e/LongFast", second_payload.data(), static_cast<int>(second_payload.size()));
 
     EXPECT_NE(first_packet.observer, second_packet.observer);
-    EXPECT_EQ(first_packet.content_hash, second_packet.content_hash);
+    EXPECT_EQ(first_packet.packet_key, second_packet.packet_key);
+}
+
+TEST(ParserTest, IgnoresReceiverMetricsWhenGroupingPackets) {
+    meshtastic::ServiceEnvelope first;
+    auto* first_mesh_packet = first.mutable_packet();
+    first_mesh_packet->set_from(0x12345678);
+    first_mesh_packet->set_to(0x87654321);
+    first_mesh_packet->set_id(0x01020304);
+    first_mesh_packet->set_rx_snr(4.5f);
+    first_mesh_packet->set_rx_rssi(-90);
+
+    meshtastic::ServiceEnvelope second = first;
+    second.mutable_packet()->set_rx_snr(8.0f);
+    second.mutable_packet()->set_rx_rssi(-70);
+
+    const std::string first_payload = first.SerializeAsString();
+    const std::string second_payload = second.SerializeAsString();
+    const ParsedPacket first_packet = parse_packet("msh/SE/2/e/LongFast", first_payload.data(), static_cast<int>(first_payload.size()));
+    const ParsedPacket second_packet = parse_packet("msh/SE/2/e/LongFast", second_payload.data(), static_cast<int>(second_payload.size()));
+
+    EXPECT_EQ(first_packet.packet_key, second_packet.packet_key);
+    EXPECT_NE(first_packet.rx_snr, second_packet.rx_snr);
+    EXPECT_NE(first_packet.rx_rssi, second_packet.rx_rssi);
 }
 
 #ifdef MTSCOPE_HAVE_OPENSSL

@@ -11,11 +11,12 @@ const tableState = {
 };
 
 function esc(value) { const element = document.createElement('span'); element.textContent = value == null ? '' : String(value); return element.innerHTML; }
+function nodeLabel(id, name) { return name ? `${esc(name)} <span class="meta">(${esc(id)})</span>` : esc(id); }
 function number(value, unit) { return value == null ? '' : `<span>${esc(value)}${unit || ''}</span>`; }
 function details(packet) {
   const measurement = packet.measurement;
   let html = packet.observer ? `<span class="meta">Observer: ${esc(packet.observer)}</span>` : '';
-  if (packet.content_hash) html += `<span class="meta">Hash: <code>${esc(packet.content_hash)}</code></span>`;
+  if (packet.packet_key) html += `<span class="meta">Packet key: <code>${esc(packet.packet_key)}</code></span>`;
   if (!measurement) return html || '<span class="muted">No decoded measurement</span>';
   html += `<strong>${esc(measurement.kind)}</strong>`;
   if (measurement.text) html += `<span>${esc(measurement.text)}</span>`;
@@ -58,7 +59,7 @@ function updateSortIndicators() {
 
 function renderPackets() {
   const packets = visibleItems('packets');
-  packetBody.innerHTML = packets.map(packet => `<tr><td>${new Date(packet.received_at * 1000).toLocaleString()}</td><td class="topic-cell"><details class="topic"><summary>View</summary><code>${esc(packet.topic)}</code><span class="meta">${esc(packet.transport)} / ${esc(packet.encoding)}</span></details></td><td>${esc(packet.region)}</td><td>${esc(packet.channel)}</td><td>${esc(packet.node)}</td><td><strong>${esc(packet.packet_type) || '<span class="muted">binary</span>'}</strong></td><td>${esc(packet.sender)}</td><td>${esc(packet.observer)}</td><td class="detail">${details(packet)}<details class="raw"><summary>Raw payload</summary><code>${esc(packet.decoded_payload_hex || packet.payload_hex)}</code></details></td></tr>`).join('');
+  packetBody.innerHTML = packets.map(packet => `<tr><td>${new Date(packet.received_at * 1000).toLocaleString()}</td><td class="topic-cell"><details class="topic"><summary>View</summary><code>${esc(packet.topic)}</code><span class="meta">${esc(packet.transport)} / ${esc(packet.encoding)}</span></details></td><td>${esc(packet.region)}</td><td>${esc(packet.channel)}</td><td>${esc(packet.node)}</td><td><strong>${esc(packet.packet_type) || '<span class="muted">binary</span>'}</strong></td><td>${nodeLabel(packet.sender, packet.sender_name)}</td><td>${nodeLabel(packet.observer, packet.observer_name)}</td><td class="detail">${details(packet)}<details class="raw"><summary>Raw payload</summary><code>${esc(packet.decoded_payload_hex || packet.payload_hex)}</code></details></td></tr>`).join('');
 }
 
 function yesNo(value) { return value == null ? '<span class="muted">Unknown</span>' : value ? 'Yes' : 'No'; }

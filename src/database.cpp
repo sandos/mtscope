@@ -40,73 +40,118 @@ Database::Database(const std::string& path) {
         throw std::runtime_error("Unable to open SQLite database: " + std::string(sqlite3_errmsg(db_)));
     }
     execute("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA temp_store=MEMORY;");
-    execute("CREATE TABLE IF NOT EXISTS packets ("
-        "id INTEGER PRIMARY KEY, received_at INTEGER NOT NULL, topic TEXT NOT NULL, payload BLOB NOT NULL, "
-        "region TEXT NOT NULL DEFAULT '', transport TEXT NOT NULL DEFAULT '', encoding TEXT NOT NULL DEFAULT '', "
-        "channel TEXT NOT NULL DEFAULT '', node TEXT NOT NULL DEFAULT '', packet_type TEXT NOT NULL DEFAULT '', "
-        "sender TEXT NOT NULL DEFAULT '', observer TEXT NOT NULL DEFAULT '', content_hash TEXT NOT NULL DEFAULT '', decoded_payload_hex TEXT NOT NULL DEFAULT '');");
-    execute("CREATE INDEX IF NOT EXISTS packets_received_at ON packets(received_at);");
+    execute("CREATE TABLE IF NOT EXISTS logical_packets ("
+        "id INTEGER PRIMARY KEY, packet_key TEXT NOT NULL UNIQUE, sender TEXT NOT NULL DEFAULT '', destination TEXT NOT NULL DEFAULT '', "
+        "mesh_packet_id INTEGER, channel TEXT NOT NULL DEFAULT '', packet_type TEXT NOT NULL DEFAULT '', logical_payload BLOB NOT NULL, "
+        "decoded_payload_hex TEXT NOT NULL DEFAULT '', first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL);");
+    execute("CREATE TABLE IF NOT EXISTS observations ("
+        "id INTEGER PRIMARY KEY, logical_packet_id INTEGER NOT NULL, observed_at INTEGER NOT NULL, topic TEXT NOT NULL, payload BLOB NOT NULL, "
+        "region TEXT NOT NULL DEFAULT '', transport TEXT NOT NULL DEFAULT '', encoding TEXT NOT NULL DEFAULT '', node TEXT NOT NULL DEFAULT '', observer TEXT NOT NULL DEFAULT '', "
+        "rx_time INTEGER, rx_snr REAL, rx_rssi INTEGER, hop_limit INTEGER, hop_start INTEGER, via_mqtt INTEGER NOT NULL DEFAULT 0);");
+    execute("CREATE INDEX IF NOT EXISTS observations_observed_at ON observations(observed_at);");
+    execute("CREATE INDEX IF NOT EXISTS observations_logical_packet_id ON observations(logical_packet_id);");
     execute("CREATE TABLE IF NOT EXISTS measurements ("
-        "id INTEGER PRIMARY KEY, packet_id INTEGER NOT NULL, received_at INTEGER NOT NULL, kind TEXT NOT NULL, "
+        "id INTEGER PRIMARY KEY, logical_packet_id INTEGER NOT NULL, received_at INTEGER NOT NULL, kind TEXT NOT NULL, "
         "node_id TEXT NOT NULL DEFAULT '', long_name TEXT NOT NULL DEFAULT '', short_name TEXT NOT NULL DEFAULT '', "
         "hardware_model TEXT NOT NULL DEFAULT '', role TEXT NOT NULL DEFAULT '', is_licensed INTEGER, is_unmessagable INTEGER, has_public_key INTEGER NOT NULL DEFAULT 0, "
         "text TEXT NOT NULL DEFAULT '', latitude REAL, longitude REAL, altitude REAL, battery_level REAL, "
-        "voltage REAL, temperature REAL, relative_humidity REAL, pressure REAL);");
+        "voltage REAL, temperature REAL, relative_humidity REAL, pressure REAL, UNIQUE(logical_packet_id, kind));");
     execute("CREATE INDEX IF NOT EXISTS measurements_received_at ON measurements(received_at);");
-    prepare("INSERT INTO packets(received_at, topic, payload, region, transport, encoding, channel, node, packet_type, sender, observer, content_hash, decoded_payload_hex) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", &insert_);
-    prepare("INSERT INTO measurements(received_at, packet_id, kind, node_id, long_name, short_name, hardware_model, role, is_licensed, is_unmessagable, has_public_key, text, latitude, longitude, altitude, battery_level, voltage, temperature, relative_humidity, pressure) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", &measurement_insert_);
-    prepare("DELETE FROM packets WHERE received_at < ?", &purge_);
-    prepare("DELETE FROM measurements WHERE received_at < ?", &measurement_purge_);
+    prepare("INSERT OR IGNORE INTO logical_packets(packet_key, sender, destination, mesh_packet_id, channel, packet_type, logical_payload, decoded_payload_hex, first_seen, last_seen) VALUES(?,?,?,?,?,?,?,?,?,?)", &logical_insert_);
+    prepare("UPDATE logical_packets SET last_seen = ?, packet_type = ?, decoded_payload_hex = ? WHERE packet_key = ?", &logical_update_);
+    prepare("SELECT id FROM logical_packets WHERE packet_key = ?", &logical_select_);
+    prepare("INSERT INTO observations(logical_packet_id, observed_at, topic, payload, region, transport, encoding, node, observer, rx_time, rx_snr, rx_rssi, hop_limit, hop_start, via_mqtt) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", &observation_insert_);
+    prepare("INSERT OR IGNORE INTO measurements(received_at, logical_packet_id, kind, node_id, long_name, short_name, hardware_model, role, is_licensed, is_unmessagable, has_public_key, text, latitude, longitude, altitude, battery_level, voltage, temperature, relative_humidity, pressure) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", &measurement_insert_);
+    prepare("DELETE FROM observations WHERE observed_at < ?", &purge_observations_);
+    prepare("DELETE FROM measurements WHERE logical_packet_id NOT IN (SELECT DISTINCT logical_packet_id FROM observations)", &measurement_purge_);
+    prepare("DELETE FROM logical_packets WHERE id NOT IN (SELECT DISTINCT logical_packet_id FROM observations)", &logical_purge_);
 }
 
 Database::~Database() {
-    sqlite3_finalize(insert_);
+    sqlite3_finalize(logical_insert_);
+    sqlite3_finalize(logical_update_);
+    sqlite3_finalize(logical_select_);
+    sqlite3_finalize(observation_insert_);
     sqlite3_finalize(measurement_insert_);
-    sqlite3_finalize(purge_);
+    sqlite3_finalize(purge_observations_);
     sqlite3_finalize(measurement_purge_);
+    sqlite3_finalize(logical_purge_);
     sqlite3_close(db_);
 }
 
 void Database::insert(const std::string& topic, const void* payload, int length) {
     const ParsedPacket parsed = parse_packet(topic, payload, length);
     std::lock_guard<std::mutex> lock(mutex_);
-    sqlite3_reset(insert_);
-    sqlite3_clear_bindings(insert_);
-    sqlite3_bind_int64(insert_, 1, now_seconds());
-    sqlite3_bind_text(insert_, 2, topic.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_blob(insert_, 3, payload, length, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 4, parsed.region.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 5, parsed.transport.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 6, parsed.encoding.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 7, parsed.channel.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 8, parsed.node.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 9, parsed.packet_type.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 10, parsed.sender.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 11, parsed.observer.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 12, parsed.content_hash.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(insert_, 13, parsed.decoded_payload_hex.c_str(), -1, SQLITE_TRANSIENT);
-    if (sqlite3_step(insert_) != SQLITE_DONE) {
+    const auto received_at = now_seconds();
+    sqlite3_reset(logical_insert_);
+    sqlite3_clear_bindings(logical_insert_);
+    sqlite3_bind_text(logical_insert_, 1, parsed.packet_key.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(logical_insert_, 2, parsed.sender.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(logical_insert_, 3, parsed.destination.c_str(), -1, SQLITE_TRANSIENT);
+    if (parsed.mesh_packet_id) sqlite3_bind_int64(logical_insert_, 4, *parsed.mesh_packet_id); else sqlite3_bind_null(logical_insert_, 4);
+    sqlite3_bind_text(logical_insert_, 5, parsed.channel.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(logical_insert_, 6, parsed.packet_type.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_blob(logical_insert_, 7, parsed.logical_payload.data(), static_cast<int>(parsed.logical_payload.size()), SQLITE_TRANSIENT);
+    sqlite3_bind_text(logical_insert_, 8, parsed.decoded_payload_hex.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(logical_insert_, 9, received_at);
+    sqlite3_bind_int64(logical_insert_, 10, received_at);
+    if (sqlite3_step(logical_insert_) != SQLITE_DONE) {
         std::cerr << "SQLite insert failed: " << sqlite3_errmsg(db_) << "\n";
         return;
     }
-    if (parsed.measurement) insert_measurement(sqlite3_last_insert_rowid(db_), *parsed.measurement);
+    sqlite3_reset(logical_update_);
+    sqlite3_clear_bindings(logical_update_);
+    sqlite3_bind_int64(logical_update_, 1, received_at);
+    sqlite3_bind_text(logical_update_, 2, parsed.packet_type.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(logical_update_, 3, parsed.decoded_payload_hex.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(logical_update_, 4, parsed.packet_key.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_step(logical_update_);
+    sqlite3_reset(logical_select_);
+    sqlite3_clear_bindings(logical_select_);
+    sqlite3_bind_text(logical_select_, 1, parsed.packet_key.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(logical_select_) != SQLITE_ROW) return;
+    const auto logical_packet_id = sqlite3_column_int64(logical_select_, 0);
+    sqlite3_reset(observation_insert_);
+    sqlite3_clear_bindings(observation_insert_);
+    sqlite3_bind_int64(observation_insert_, 1, logical_packet_id);
+    sqlite3_bind_int64(observation_insert_, 2, received_at);
+    sqlite3_bind_text(observation_insert_, 3, topic.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_blob(observation_insert_, 4, payload, length, SQLITE_TRANSIENT);
+    sqlite3_bind_text(observation_insert_, 5, parsed.region.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(observation_insert_, 6, parsed.transport.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(observation_insert_, 7, parsed.encoding.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(observation_insert_, 8, parsed.node.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(observation_insert_, 9, parsed.observer.c_str(), -1, SQLITE_TRANSIENT);
+    if (parsed.rx_time) sqlite3_bind_int64(observation_insert_, 10, *parsed.rx_time); else sqlite3_bind_null(observation_insert_, 10);
+    if (parsed.rx_snr) sqlite3_bind_double(observation_insert_, 11, *parsed.rx_snr); else sqlite3_bind_null(observation_insert_, 11);
+    if (parsed.rx_rssi) sqlite3_bind_int(observation_insert_, 12, *parsed.rx_rssi); else sqlite3_bind_null(observation_insert_, 12);
+    if (parsed.hop_limit) sqlite3_bind_int64(observation_insert_, 13, *parsed.hop_limit); else sqlite3_bind_null(observation_insert_, 13);
+    if (parsed.hop_start) sqlite3_bind_int64(observation_insert_, 14, *parsed.hop_start); else sqlite3_bind_null(observation_insert_, 14);
+    sqlite3_bind_int(observation_insert_, 15, parsed.via_mqtt);
+    if (sqlite3_step(observation_insert_) != SQLITE_DONE) {
+        std::cerr << "SQLite observation insert failed: " << sqlite3_errmsg(db_) << "\n";
+        return;
+    }
+    if (parsed.measurement) insert_measurement(logical_packet_id, received_at, *parsed.measurement);
 }
 
 void Database::purge(int retention_days) {
     std::lock_guard<std::mutex> lock(mutex_);
     const auto cutoff = now_seconds() - static_cast<std::int64_t>(retention_days) * 86400;
-    sqlite3_reset(purge_);
-    sqlite3_clear_bindings(purge_);
-    sqlite3_bind_int64(purge_, 1, cutoff);
-    if (sqlite3_step(purge_) != SQLITE_DONE) std::cerr << "SQLite purge failed: " << sqlite3_errmsg(db_) << "\n";
+    sqlite3_reset(purge_observations_);
+    sqlite3_clear_bindings(purge_observations_);
+    sqlite3_bind_int64(purge_observations_, 1, cutoff);
+    if (sqlite3_step(purge_observations_) != SQLITE_DONE) std::cerr << "SQLite observation purge failed: " << sqlite3_errmsg(db_) << "\n";
     sqlite3_reset(measurement_purge_);
     sqlite3_clear_bindings(measurement_purge_);
-    sqlite3_bind_int64(measurement_purge_, 1, cutoff);
     if (sqlite3_step(measurement_purge_) != SQLITE_DONE) std::cerr << "SQLite measurement purge failed: " << sqlite3_errmsg(db_) << "\n";
+    sqlite3_reset(logical_purge_);
+    sqlite3_clear_bindings(logical_purge_);
+    if (sqlite3_step(logical_purge_) != SQLITE_DONE) std::cerr << "SQLite logical packet purge failed: " << sqlite3_errmsg(db_) << "\n";
 }
 
 std::string Database::recent_json() {
-    constexpr const char* sql = "SELECT p.received_at, p.topic, p.payload, p.region, p.transport, p.encoding, p.channel, p.node, p.packet_type, p.sender, p.observer, p.content_hash, p.decoded_payload_hex, m.kind, m.node_id, m.long_name, m.short_name, m.hardware_model, m.role, m.is_licensed, m.is_unmessagable, m.has_public_key, m.text, m.latitude, m.longitude, m.altitude, m.battery_level, m.voltage, m.temperature, m.relative_humidity, m.pressure FROM packets p LEFT JOIN measurements m ON m.packet_id = p.id ORDER BY p.id DESC LIMIT 500";
+    constexpr const char* sql = "SELECT o.observed_at, o.topic, o.payload, o.region, o.transport, o.encoding, o.node, o.observer, o.rx_time, o.rx_snr, o.rx_rssi, o.hop_limit, o.hop_start, o.via_mqtt, lp.packet_key, lp.sender, lp.destination, lp.mesh_packet_id, lp.channel, lp.packet_type, lp.logical_payload, lp.decoded_payload_hex, m.kind, m.node_id, m.long_name, m.short_name, m.hardware_model, m.role, m.is_licensed, m.is_unmessagable, m.has_public_key, m.text, m.latitude, m.longitude, m.altitude, m.battery_level, m.voltage, m.temperature, m.relative_humidity, m.pressure, (SELECT m2.short_name FROM measurements m2 WHERE m2.kind = 'nodeinfo' AND m2.node_id = lp.sender AND m2.received_at <= o.observed_at ORDER BY m2.received_at DESC, m2.id DESC LIMIT 1), (SELECT m2.short_name FROM measurements m2 WHERE m2.kind = 'nodeinfo' AND m2.node_id = o.observer AND m2.received_at <= o.observed_at ORDER BY m2.received_at DESC, m2.id DESC LIMIT 1), (SELECT m2.short_name FROM measurements m2 WHERE m2.kind = 'nodeinfo' AND m2.node_id = lp.destination AND m2.received_at <= o.observed_at ORDER BY m2.received_at DESC, m2.id DESC LIMIT 1) FROM observations o JOIN logical_packets lp ON lp.id = o.logical_packet_id LEFT JOIN measurements m ON m.logical_packet_id = lp.id ORDER BY o.id DESC LIMIT 500";
     std::lock_guard<std::mutex> lock(mutex_);
     sqlite3_stmt* statement = nullptr;
     if (sqlite3_prepare_v2(db_, sql, -1, &statement, nullptr) != SQLITE_OK) return "[]";
@@ -119,11 +164,32 @@ std::string Database::recent_json() {
         const auto number = [&](int column) { return sqlite3_column_type(statement, column) == SQLITE_NULL ? std::string("null") : std::to_string(sqlite3_column_double(statement, column)); };
         result += "{\"received_at\":" + std::to_string(sqlite3_column_int64(statement, 0));
         result += ",\"topic\":\"" + text(1) + "\",\"payload_hex\":\"" + hex_encode(sqlite3_column_blob(statement, 2), sqlite3_column_bytes(statement, 2)) + "\"";
-        result += ",\"region\":\"" + text(3) + "\",\"transport\":\"" + text(4) + "\",\"encoding\":\"" + text(5) + "\",\"channel\":\"" + text(6) + "\",\"node\":\"" + text(7) + "\",\"packet_type\":\"" + text(8) + "\",\"sender\":\"" + text(9) + "\",\"observer\":\"" + text(10) + "\",\"content_hash\":\"" + text(11) + "\",\"decoded_payload_hex\":\"" + text(12) + "\"";
-        if (sqlite3_column_type(statement, 13) != SQLITE_NULL) {
-            result += ",\"measurement\":{\"kind\":\"" + text(13) + "\",\"node_id\":\"" + text(14) + "\",\"long_name\":\"" + text(15) + "\",\"short_name\":\"" + text(16) + "\",\"hardware_model\":\"" + text(17) + "\",\"role\":\"" + text(18) + "\",\"is_licensed\":" + number(19) + ",\"is_unmessagable\":" + number(20) + ",\"has_public_key\":" + number(21) + ",\"text\":\"" + text(22) + "\",\"latitude\":" + number(23) + ",\"longitude\":" + number(24) + ",\"altitude\":" + number(25) + ",\"battery_level\":" + number(26) + ",\"voltage\":" + number(27) + ",\"temperature\":" + number(28) + ",\"relative_humidity\":" + number(29) + ",\"pressure\":" + number(30) + "}";
+        result += ",\"region\":\"" + text(3) + "\",\"transport\":\"" + text(4) + "\",\"encoding\":\"" + text(5) + "\",\"node\":\"" + text(6) + "\",\"observer\":\"" + text(7) + "\",\"rx_time\":" + number(8) + ",\"rx_snr\":" + number(9) + ",\"rx_rssi\":" + number(10) + ",\"hop_limit\":" + number(11) + ",\"hop_start\":" + number(12) + ",\"via_mqtt\":" + std::to_string(sqlite3_column_int(statement, 13));
+        result += ",\"packet_key\":\"" + text(14) + "\",\"sender\":\"" + text(15) + "\",\"destination\":\"" + text(16) + "\",\"mesh_packet_id\":" + number(17) + ",\"channel\":\"" + text(18) + "\",\"packet_type\":\"" + text(19) + "\",\"decoded_payload_hex\":\"" + text(21) + "\"";
+        if (sqlite3_column_type(statement, 22) != SQLITE_NULL) {
+            result += ",\"measurement\":{\"kind\":\"" + text(22) + "\",\"node_id\":\"" + text(23) + "\",\"long_name\":\"" + text(24) + "\",\"short_name\":\"" + text(25) + "\",\"hardware_model\":\"" + text(26) + "\",\"role\":\"" + text(27) + "\",\"is_licensed\":" + number(28) + ",\"is_unmessagable\":" + number(29) + ",\"has_public_key\":" + number(30) + ",\"text\":\"" + text(31) + "\",\"latitude\":" + number(32) + ",\"longitude\":" + number(33) + ",\"altitude\":" + number(34) + ",\"battery_level\":" + number(35) + ",\"voltage\":" + number(36) + ",\"temperature\":" + number(37) + ",\"relative_humidity\":" + number(38) + ",\"pressure\":" + number(39) + "}";
         }
+        result += ",\"sender_name\":\"" + text(40) + "\",\"observer_name\":\"" + text(41) + "\",\"destination_name\":\"" + text(42) + "\"";
         result += "}";
+    }
+    sqlite3_finalize(statement);
+    return result + "]";
+}
+
+std::string Database::observations_json(const std::string& packet_key) {
+    constexpr const char* sql = "SELECT o.observed_at, o.topic, o.region, o.transport, o.encoding, o.node, o.observer, o.rx_time, o.rx_snr, o.rx_rssi, o.hop_limit, o.hop_start, o.via_mqtt FROM observations o JOIN logical_packets lp ON lp.id = o.logical_packet_id WHERE lp.packet_key = ? ORDER BY o.id";
+    std::lock_guard<std::mutex> lock(mutex_);
+    sqlite3_stmt* statement = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &statement, nullptr) != SQLITE_OK) return "[]";
+    sqlite3_bind_text(statement, 1, packet_key.c_str(), -1, SQLITE_TRANSIENT);
+    std::string result = "[";
+    bool first = true;
+    while (sqlite3_step(statement) == SQLITE_ROW) {
+        if (!first) result += ',';
+        first = false;
+        const auto text = [&](int column) { return json_escape(sqlite3_column_text(statement, column), sqlite3_column_bytes(statement, column)); };
+        const auto number = [&](int column) { return sqlite3_column_type(statement, column) == SQLITE_NULL ? std::string("null") : std::to_string(sqlite3_column_double(statement, column)); };
+        result += "{\"observed_at\":" + std::to_string(sqlite3_column_int64(statement, 0)) + ",\"topic\":\"" + text(1) + "\",\"region\":\"" + text(2) + "\",\"transport\":\"" + text(3) + "\",\"encoding\":\"" + text(4) + "\",\"node\":\"" + text(5) + "\",\"observer\":\"" + text(6) + "\",\"rx_time\":" + number(7) + ",\"rx_snr\":" + number(8) + ",\"rx_rssi\":" + number(9) + ",\"hop_limit\":" + number(10) + ",\"hop_start\":" + number(11) + ",\"via_mqtt\":" + std::to_string(sqlite3_column_int(statement, 12)) + "}";
     }
     sqlite3_finalize(statement);
     return result + "]";
@@ -147,11 +213,11 @@ std::string Database::nodes_json() {
     return result + "]";
 }
 
-void Database::insert_measurement(std::int64_t packet_id, const Measurement& measurement) {
+void Database::insert_measurement(std::int64_t logical_packet_id, std::int64_t received_at, const Measurement& measurement) {
     sqlite3_reset(measurement_insert_);
     sqlite3_clear_bindings(measurement_insert_);
-    sqlite3_bind_int64(measurement_insert_, 1, now_seconds());
-    sqlite3_bind_int64(measurement_insert_, 2, packet_id);
+    sqlite3_bind_int64(measurement_insert_, 1, received_at);
+    sqlite3_bind_int64(measurement_insert_, 2, logical_packet_id);
     sqlite3_bind_text(measurement_insert_, 3, measurement.kind.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(measurement_insert_, 4, measurement.node_id.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(measurement_insert_, 5, measurement.long_name.c_str(), -1, SQLITE_TRANSIENT);

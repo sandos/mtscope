@@ -37,9 +37,18 @@ struct ParsedPacket {
     std::string node;
     std::string packet_type;
     std::string sender;
+    std::string destination;
     std::string observer;
-    std::string content_hash;
+    std::string packet_key;
+    std::string logical_payload;
     std::string decoded_payload_hex;
+    std::optional<std::uint32_t> mesh_packet_id;
+    std::optional<std::uint32_t> rx_time;
+    std::optional<double> rx_snr;
+    std::optional<std::int32_t> rx_rssi;
+    std::optional<std::uint32_t> hop_limit;
+    std::optional<std::uint32_t> hop_start;
+    bool via_mqtt = false;
     std::optional<Measurement> measurement;
 };
 

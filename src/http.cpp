@@ -54,7 +54,11 @@ void serve_http(Database& database, int port, const std::string& web_root) {
         char request[1024]{};
         const ssize_t size = recv(client, request, sizeof(request) - 1, 0);
         const std::string line(request, size > 0 ? static_cast<size_t>(size) : 0);
-        if (line.rfind("GET /api/packets ", 0) == 0) send_response(client, "application/json", database.recent_json());
+        if (line.rfind("GET /api/packets/", 0) == 0 && line.find("/observations ") != std::string::npos) {
+            const size_t prefix = std::string("GET /api/packets/").size();
+            const size_t suffix = line.find("/observations ", prefix);
+            send_response(client, "application/json", database.observations_json(line.substr(prefix, suffix - prefix)));
+        } else if (line.rfind("GET /api/packets ", 0) == 0) send_response(client, "application/json", database.recent_json());
         else if (line.rfind("GET /api/nodes ", 0) == 0) send_response(client, "application/json", database.nodes_json());
         else if (line.rfind("GET /styles.css ", 0) == 0) send_response(client, "text/css", stylesheet);
         else if (line.rfind("GET /app.js ", 0) == 0) send_response(client, "application/javascript", script);

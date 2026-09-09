@@ -30,6 +30,20 @@ std::string content_hash(const std::string& value) {
     return output;
 }
 
+std::string packet_key(const meshtastic::MeshPacket& mesh_packet) {
+    std::string identity;
+    const auto append_value = [&identity](std::uint32_t value) {
+        identity.append(reinterpret_cast<const char*>(&value), sizeof(value));
+    };
+    append_value(mesh_packet.from());
+    append_value(mesh_packet.to());
+    append_value(mesh_packet.id());
+    append_value(mesh_packet.channel());
+    if (mesh_packet.has_decoded()) identity += mesh_packet.decoded().SerializeAsString();
+    if (mesh_packet.has_encrypted()) identity += mesh_packet.encrypted();
+    return content_hash(identity);
+}
+
 std::vector<std::string> split_topic(const std::string& topic) {
     std::vector<std::string> parts;
     size_t start = 0;
@@ -202,7 +216,8 @@ ParsedPacket parse_packet(const std::string& topic, const void* payload, int len
         packet.sender = json_field(json, "sender");
         packet.observer = json_field(json, "gatewayId");
         if (packet.observer.empty()) packet.observer = json_field(json, "gateway_id");
-        packet.content_hash = content_hash(json);
+        packet.packet_key = content_hash(json);
+        packet.logical_payload = json;
         if (packet.channel.empty()) packet.channel = json_field(json, "channel");
         Measurement measurement;
         if (packet.packet_type == "text") {
@@ -232,13 +247,25 @@ ParsedPacket parse_packet(const std::string& topic, const void* payload, int len
     } else if (packet.encoding == "stat") {
         packet.packet_type = "status";
         packet.sender = packet.node;
+        packet.packet_key = content_hash(std::string(static_cast<const char*>(payload), static_cast<size_t>(length)));
+        packet.logical_payload.assign(static_cast<const char*>(payload), static_cast<size_t>(length));
     } else {
         meshtastic::ServiceEnvelope envelope;
         if (envelope.ParseFromArray(payload, length) && envelope.has_packet()) {
             const auto& mesh_packet = envelope.packet();
             packet.sender = node_id(mesh_packet.from());
+            packet.destination = node_id(mesh_packet.to());
             packet.observer = envelope.gateway_id();
-            packet.content_hash = content_hash(mesh_packet.SerializeAsString());
+            packet.packet_key = packet_key(mesh_packet);
+            if (mesh_packet.has_decoded()) packet.logical_payload = mesh_packet.decoded().SerializeAsString();
+            else if (mesh_packet.has_encrypted()) packet.logical_payload = mesh_packet.encrypted();
+            packet.mesh_packet_id = mesh_packet.id();
+            if (mesh_packet.has_rx_time()) packet.rx_time = mesh_packet.rx_time();
+            packet.rx_snr = mesh_packet.rx_snr();
+            if (mesh_packet.has_rx_rssi()) packet.rx_rssi = mesh_packet.rx_rssi();
+            packet.hop_limit = mesh_packet.hop_limit();
+            packet.hop_start = mesh_packet.hop_start();
+            packet.via_mqtt = mesh_packet.via_mqtt();
             if (mesh_packet.has_decoded()) {
                 decode_data(packet, mesh_packet.decoded());
             } else if (mesh_packet.has_encrypted()) {
@@ -252,6 +279,11 @@ ParsedPacket parse_packet(const std::string& topic, const void* payload, int len
 #endif
             }
         }
+    }
+    if (packet.packet_key.empty()) {
+        const std::string raw(static_cast<const char*>(payload), static_cast<size_t>(length));
+        packet.packet_key = content_hash(raw);
+        packet.logical_payload = raw;
     }
     return packet;
 }
