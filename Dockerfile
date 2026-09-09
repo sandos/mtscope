@@ -3,10 +3,11 @@ FROM ghcr.io/home-assistant/base:latest AS build
 ARG MESHTASTIC_PROTOBUF_REF=a9e83e98b8d79e757f2985bfbcb4d00c7f630157
 RUN apk add --no-cache build-base cmake git mosquitto-dev sqlite-dev protobuf protobuf-dev openssl-dev
 WORKDIR /build
-COPY CMakeLists.txt src/ ./
+COPY CMakeLists.txt ./
+COPY src ./src
 RUN git clone https://github.com/meshtastic/protobufs.git protobufs \
 	&& git -C protobufs checkout "${MESHTASTIC_PROTOBUF_REF}" \
-	&& cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMESHTASTIC_PROTOBUF_DIR=/build/protobufs \
+	&& cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DMESHTASTIC_PROTOBUF_DIR=/build/protobufs \
 	&& cmake --build build -j"$(nproc)"
 
 FROM ghcr.io/home-assistant/base:latest
