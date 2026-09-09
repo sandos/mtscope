@@ -10,7 +10,7 @@ RUN git clone https://github.com/meshtastic/protobufs.git protobufs \
 	&& cmake --build build -j"$(nproc)"
 
 FROM ghcr.io/home-assistant/base:latest
-RUN apk add --no-cache libmosquitto sqlite-libs openssl
+RUN apk add --no-cache mosquitto-libs sqlite-libs openssl
 COPY --from=build /build/build/meshat-monitor /usr/local/bin/meshat-monitor
 COPY web /usr/local/share/meshat-monitor
 COPY run.sh /run.sh
