@@ -13,9 +13,22 @@ find_package(OpenSSL QUIET)
 find_path(MOSQUITTO_INCLUDE_DIR mosquitto.h REQUIRED)
 find_library(MOSQUITTO_LIBRARY mosquitto REQUIRED)
 
-set(MESHTASTIC_PROTOBUF_DIR "/home/sandos/projs/protobufs" CACHE PATH "Meshtastic protobuf workspace")
+set(MESHTASTIC_PROTOBUF_DEFAULT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/protobufs")
+if(NOT EXISTS "${MESHTASTIC_PROTOBUF_DEFAULT_DIR}/meshtastic" AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../protobufs/meshtastic")
+	set(MESHTASTIC_PROTOBUF_DEFAULT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../protobufs")
+endif()
+set(MESHTASTIC_PROTOBUF_DIR "${MESHTASTIC_PROTOBUF_DEFAULT_DIR}" CACHE PATH "Meshtastic protobuf workspace")
+if(NOT EXISTS "${MESHTASTIC_PROTOBUF_DIR}/meshtastic")
+	message(FATAL_ERROR
+		"Meshtastic protobuf definitions not found at '${MESHTASTIC_PROTOBUF_DIR}'. "
+		"Initialize the submodule with 'git submodule update --init --recursive' "
+		"or set -DMESHTASTIC_PROTOBUF_DIR=/path/to/protobufs.")
+endif()
 file(GLOB MESHTASTIC_PROTO_FILES CONFIGURE_DEPENDS "${MESHTASTIC_PROTOBUF_DIR}/meshtastic/*.proto")
 list(FILTER MESHTASTIC_PROTO_FILES EXCLUDE REGEX "/deviceonly(_legacy)?\\.proto$")
+if(NOT MESHTASTIC_PROTO_FILES)
+	message(FATAL_ERROR "No Meshtastic protobuf files found in '${MESHTASTIC_PROTOBUF_DIR}/meshtastic'.")
+endif()
 set(MESHTASTIC_PROTO_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(MESHTASTIC_PROTO_SOURCES)
 set(MESHTASTIC_PROTO_HEADERS)
