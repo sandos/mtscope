@@ -3,6 +3,7 @@
 #include <string>
 
 class Database;
+class Monitor;
 
 class HttpServer {
 public:
@@ -12,7 +13,7 @@ public:
 	HttpServer(const HttpServer&) = delete;
 	HttpServer& operator=(const HttpServer&) = delete;
 
-	void serve(Database& database) const;
+	void serve(Database& database, const Monitor& monitor) const;
 
 private:
 	std::string index_;

@@ -2,6 +2,8 @@
 
 #include "config.h"
 
+#include <atomic>
+
 class Database;
 struct mosquitto;
 
@@ -14,6 +16,7 @@ public:
     Monitor& operator=(const Monitor&) = delete;
 
     void run();
+    bool connected() const { return connected_.load(); }
 
 private:
     static void on_connect(mosquitto* client, void* context, int result);
@@ -23,4 +26,5 @@ private:
     const Config& config_;
     Database& database_;
     mosquitto* client_ = nullptr;
+    std::atomic<bool> connected_{false};
 };

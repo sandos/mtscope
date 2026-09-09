@@ -10,6 +10,7 @@
 
 #include "app.h"
 #include "database.h"
+#include "monitor.h"
 
 namespace {
 
@@ -49,7 +50,7 @@ HttpServer::~HttpServer() {
     if (server_ >= 0) close(server_);
 }
 
-void HttpServer::serve(Database& database) const {
+void HttpServer::serve(Database& database, const Monitor& monitor) const {
     while (running) {
         fd_set readable;
         FD_ZERO(&readable);
@@ -67,6 +68,7 @@ void HttpServer::serve(Database& database) const {
             send_response(client, "application/json", database.observations_json(line.substr(prefix, suffix - prefix)));
         } else if (line.rfind("GET /api/packets ", 0) == 0) send_response(client, "application/json", database.recent_json());
         else if (line.rfind("GET /api/nodes ", 0) == 0) send_response(client, "application/json", database.nodes_json());
+        else if (line.rfind("GET /api/status ", 0) == 0) send_response(client, "application/json", monitor.connected() ? "{\"mqtt_connected\":true}" : "{\"mqtt_connected\":false}");
         else if (line.rfind("GET /styles.css ", 0) == 0) send_response(client, "text/css", stylesheet_);
         else if (line.rfind("GET /app.js ", 0) == 0) send_response(client, "application/javascript", script_);
         else send_response(client, "text/html", index_);

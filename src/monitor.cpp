@@ -34,18 +34,23 @@ void Monitor::run() {
 void Monitor::on_connect(mosquitto* client, void* context, int result) {
     auto* monitor = static_cast<Monitor*>(context);
     if (result != MOSQ_ERR_SUCCESS) {
+        monitor->connected_.store(false);
         std::cerr << "MQTT connection failed: " << result << " (" << mosquitto_strerror(result) << ")\n";
         return;
     }
     const int subscribe_result = mosquitto_subscribe(client, nullptr, monitor->config_.topic.c_str(), 0);
     if (subscribe_result != MOSQ_ERR_SUCCESS) {
+        monitor->connected_.store(false);
         std::cerr << "MQTT subscription failed: " << subscribe_result << " (" << mosquitto_strerror(subscribe_result) << ")\n";
         return;
     }
+    monitor->connected_.store(true);
     std::cerr << "Subscribed to " << monitor->config_.topic << "\n";
 }
 
-void Monitor::on_disconnect(mosquitto*, void*, int result) {
+void Monitor::on_disconnect(mosquitto*, void* context, int result) {
+    auto* monitor = static_cast<Monitor*>(context);
+    monitor->connected_.store(false);
     if (result != MOSQ_ERR_SUCCESS) {
         std::cerr << "MQTT disconnected: " << result << " (" << mosquitto_strerror(result) << ")\n";
     } else {

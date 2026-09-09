@@ -23,18 +23,22 @@ table { width: 100%; table-layout: fixed; border-collapse: collapse; background:
 .packet-column { width: 180px; }
 .details-column { width: 38%; }
 .node-id-column { width: 8%; }
-.node-long-name-column { width: 19%; }
+.node-long-name-column { width: 21%; }
 .node-short-name-column { width: 5%; }
-.node-hardware-column { width: 13%; }
+.node-hardware-column { width: 15%; }
 .node-role-column { width: 7%; }
 .node-status-column { display: none; width: 12%; }
 .node-status-column.visible { display: table-column; }
 .node-latitude-column { width: 5.5%; }
 .node-longitude-column { width: 5.5%; }
 .node-altitude-column { width: 5%; }
-.node-map-column { width: 10%; }
+.node-map-column { width: 5%; }
 .node-last-seen-column { width: 10%; }
 .node-hardware { overflow-wrap: anywhere; }
+.packet-security { display: inline-block; margin-right: 5px; font-size: 13px; }
+.packet-security.decrypted { color: #28704f; }
+.packet-security.encrypted { color: #9a681b; }
+.packet-type-label { white-space: normal; }
 .node-latitude, .node-longitude, .node-altitude, .node-map { white-space: nowrap; }
 th, td { padding: 10px; text-align: left; border-bottom: 1px solid #dce4df; vertical-align: top; }
 th { background: #e2ebe5; font-size: 12px; }
@@ -58,7 +62,7 @@ code { display: block; max-width: 460px; white-space: pre-wrap; word-break: brea
 @media (max-width: 1050px) { main { padding: 18px 10px; } .topic-cell, .topic-column { display: none; } }
 @media (max-width: 760px) { td, th { padding: 7px; } .detail { min-width: 150px; } }
 @media (max-width: 560px) {
-	.received-column, .channel-column, .node-column, .packet-column, .sender-column, .observer-column, .details-column { width: auto; }
-	th:nth-child(3), td:nth-child(3), th:nth-child(5), td:nth-child(5) { display: none; }
+	.received-column, .node-column, .packet-column, .sender-column, .observer-column, .details-column { width: auto; }
+	th:nth-child(3), td:nth-child(3), th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5) { display: none; }
 }
 @media (max-width: 560px) { .filter input { box-sizing: border-box; display: block; margin: 6px 0 0; max-width: none; width: 100%; } }

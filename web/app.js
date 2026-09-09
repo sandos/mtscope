@@ -8,6 +8,7 @@ const nodeFilter = document.querySelector('#node-filter');
 const showStatus = document.querySelector('#show-status');
 const statusColumn = document.querySelector('.node-status-column');
 const connectionStatus = document.querySelector('#connection-status');
+const mqttStatus = document.querySelector('#mqtt-status');
 const statusText = document.querySelector('#status-text');
 const tableState = {
   packets: { items: [], filter: '', sortKey: null, descending: false },
@@ -17,6 +18,20 @@ const tableState = {
 function esc(value) { const element = document.createElement('span'); element.textContent = value == null ? '' : String(value); return element.innerHTML; }
 function nodeLabel(id, name) { return name ? `<a href="#nodes" data-node-id="${esc(id)}">${esc(name)}</a>` : esc(id); }
 function number(value, unit) { return value == null ? '' : `<span>${esc(value)}${unit || ''}</span>`; }
+function packetTypeLabel(type) {
+  if (!type) return '<span class="muted">binary</span>';
+  let label = type;
+  let security = '';
+  if (label.startsWith('decrypted_')) {
+    security = '<span class="packet-security decrypted" title="Decrypted" aria-label="Decrypted">&#128275;</span>';
+    label = label.slice('decrypted_'.length);
+  } else if (label === 'encrypted') {
+    security = '<span class="packet-security encrypted" title="Encrypted" aria-label="Encrypted">&#128274;</span>';
+    return `${security}<span class="packet-type-label">Encrypted</span>`;
+  }
+  label = label.replace(/_APP$/, '').replaceAll('_', ' ');
+  return `${security}<span class="packet-type-label">${esc(label)}</span>`;
+}
 function groupPackets(packets) {
   const groups = new Map();
   packets.forEach(packet => {
@@ -91,7 +106,7 @@ function updateSortIndicators() {
 
 function renderPackets() {
   const packets = visibleItems('packets');
-  packetBody.innerHTML = packets.map(packet => `<tr><td>${new Date(packet.received_at * 1000).toLocaleString()}</td><td class="topic-cell"><details class="topic"><summary>View</summary><code>${esc(packet.topic)}</code><span class="meta">${esc(packet.transport)} / ${esc(packet.encoding)}</span></details></td><td>${esc(packet.region)}</td><td>${esc(packet.channel)}</td><td>${esc(packet.node)}</td><td><strong>${esc(packet.packet_type) || '<span class="muted">binary</span>'}</strong></td><td>${nodeLabel(packet.sender, packet.sender_name)}</td><td>${nodeLabel(packet.observer, packet.observer_name)}</td><td class="detail">${details(packet)}<details class="raw"><summary>Raw payload</summary><code>${esc(packet.decoded_payload_hex || packet.payload_hex)}</code></details></td></tr>`).join('');
+  packetBody.innerHTML = packets.map(packet => `<tr><td>${new Date(packet.received_at * 1000).toLocaleString()}</td><td class="topic-cell"><details class="topic"><summary>View</summary><code>${esc(packet.topic)}</code><span class="meta">${esc(packet.transport)} / ${esc(packet.encoding)}</span></details></td><td>${esc(packet.region)}</td><td>${esc(packet.channel)}</td><td>${esc(packet.node)}</td><td><strong>${packetTypeLabel(packet.packet_type)}</strong></td><td>${nodeLabel(packet.sender, packet.sender_name)}</td><td>${nodeLabel(packet.observer, packet.observer_name)}</td><td class="detail">${details(packet)}<details class="raw"><summary>Raw payload</summary><code>${esc(packet.decoded_payload_hex || packet.payload_hex)}</code></details></td></tr>`).join('');
 }
 
 function yesNo(value) { return value == null ? missing() : value ? 'Yes' : 'No'; }
@@ -162,7 +177,7 @@ async function load() {
   connectionStatus.setAttribute('aria-label', 'Refreshing monitor data');
   connectionStatus.title = 'Refreshing monitor data';
   try {
-    const [packets, nodes] = await Promise.all([fetch('/api/packets').then(response => response.json()), fetch('/api/nodes').then(response => response.json())]);
+    const [packets, nodes, monitorStatus] = await Promise.all([fetch('/api/packets').then(response => response.json()), fetch('/api/nodes').then(response => response.json()), fetch('/api/status').then(response => response.json())]);
     tableState.packets.items = groupPackets(packets);
     tableState.nodes.items = nodes;
     renderPackets();
@@ -172,11 +187,17 @@ async function load() {
     connectionStatus.className = 'connection-status connected';
     connectionStatus.setAttribute('aria-label', 'Monitor connected');
     connectionStatus.title = 'Monitor connected';
+    mqttStatus.className = `connection-status ${monitorStatus.mqtt_connected ? 'connected' : 'error'}`;
+    mqttStatus.setAttribute('aria-label', monitorStatus.mqtt_connected ? 'MQTT connected' : 'MQTT disconnected');
+    mqttStatus.title = monitorStatus.mqtt_connected ? 'MQTT connected' : 'MQTT disconnected';
   } catch (error) {
     statusText.textContent = 'Unable to load monitor data';
     connectionStatus.className = 'connection-status error';
     connectionStatus.setAttribute('aria-label', 'Monitor connection error');
     connectionStatus.title = 'Monitor connection error';
+    mqttStatus.className = 'connection-status error';
+    mqttStatus.setAttribute('aria-label', 'MQTT status unavailable');
+    mqttStatus.title = 'MQTT status unavailable';
   }
 }
 
