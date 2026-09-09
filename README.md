@@ -58,7 +58,7 @@ The tests start the locally built monitor on port `18099` with an isolated datab
 - Decoded application data is also inserted into `measurements`, linked to `logical_packets`. It currently normalizes text, position, node info, and telemetry fields such as battery, voltage, temperature, humidity, and pressure.
 - The database separates `logical_packets` from `observations`: one logical packet can have many MQTT observations, retaining each gateway and its receiver metadata. `measurements` remains historical and is linked to logical packets; node short names are resolved from the latest applicable node-info measurement rather than copied into a mutable node table.
 - The C++ build generates Meshtastic bindings from the `protobufs/` submodule; override this location with `-DMESHTASTIC_PROTOBUF_DIR=/path/to/protobufs` when configuring elsewhere. A sibling `../protobufs` checkout is also accepted for local development.
-- The Home Assistant image uses the checked-out `protobufs/` directory inside its Docker build context.
+- The Home Assistant image fetches the pinned public protobuf revision during its Docker build, so the add-on repository does not need to expose the submodule contents in the Home Assistant build context.
 - Persistent storage is `/data/meshat-monitor.db`, suitable for a Home Assistant add-on data volume.
 
 ## Home Assistant add-on
