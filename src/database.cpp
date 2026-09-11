@@ -61,6 +61,7 @@ Database::Database(const std::string& path) {
         "text TEXT NOT NULL DEFAULT '', latitude REAL, longitude REAL, altitude REAL, battery_level REAL, "
         "voltage REAL, temperature REAL, relative_humidity REAL, pressure REAL, UNIQUE(logical_packet_id, kind));");
     execute("CREATE INDEX IF NOT EXISTS measurements_received_at ON measurements(received_at);");
+    execute("CREATE INDEX IF NOT EXISTS measurements_nodeinfo_lookup ON measurements(kind, node_id, received_at DESC, id DESC) WHERE kind = 'nodeinfo';");
     prepare("INSERT OR IGNORE INTO logical_packets(packet_key, sender, destination, mesh_packet_id, channel, packet_type, logical_payload, decoded_payload_hex, first_seen, last_seen) VALUES(?,?,?,?,?,?,?,?,?,?)", &logical_insert_);
     prepare("UPDATE logical_packets SET last_seen = ?, packet_type = ?, decoded_payload_hex = ? WHERE packet_key = ?", &logical_update_);
     prepare("SELECT id FROM logical_packets WHERE packet_key = ?", &logical_select_);
