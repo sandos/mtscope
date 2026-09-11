@@ -1,7 +1,7 @@
 name: Meshat Monitor
 slug: meshat_monitor
 description: Stores Meshtastic MQTT packets locally and presents a compact dashboard
-version: "0.1.15"
+version: "0.1.16"
 arch:
   - aarch64
   - amd64

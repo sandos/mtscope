@@ -13,6 +13,7 @@ RUN git clone https://github.com/meshtastic/protobufs.git protobufs \
 FROM ghcr.io/home-assistant/base:latest
 RUN apk add --no-cache libgcc libstdc++ mosquitto-libs protobuf sqlite-libs openssl
 COPY --from=build /build/build/meshat-monitor /usr/local/bin/meshat-monitor
+COPY --from=build /usr/lib/libprotobuf.so.* /usr/lib/
 COPY web /usr/local/share/meshat-monitor
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
