@@ -54,6 +54,7 @@ Database::Database(const std::string& path) {
         "rx_time INTEGER, rx_snr REAL, rx_rssi INTEGER, hop_limit INTEGER, hop_start INTEGER, via_mqtt INTEGER NOT NULL DEFAULT 0);");
     execute("CREATE INDEX IF NOT EXISTS observations_observed_at ON observations(observed_at);");
     execute("CREATE INDEX IF NOT EXISTS observations_logical_packet_id ON observations(logical_packet_id);");
+    execute("CREATE INDEX IF NOT EXISTS observations_packet_time ON observations(logical_packet_id, observed_at DESC);");
     execute("CREATE TABLE IF NOT EXISTS measurements ("
         "id INTEGER PRIMARY KEY, logical_packet_id INTEGER NOT NULL, received_at INTEGER NOT NULL, kind TEXT NOT NULL, "
         "node_id TEXT NOT NULL DEFAULT '', long_name TEXT NOT NULL DEFAULT '', short_name TEXT NOT NULL DEFAULT '', "
@@ -62,6 +63,10 @@ Database::Database(const std::string& path) {
         "voltage REAL, temperature REAL, relative_humidity REAL, pressure REAL, UNIQUE(logical_packet_id, kind));");
     execute("CREATE INDEX IF NOT EXISTS measurements_received_at ON measurements(received_at);");
     execute("CREATE INDEX IF NOT EXISTS measurements_nodeinfo_lookup ON measurements(kind, node_id, received_at DESC, id DESC) WHERE kind = 'nodeinfo';");
+    execute("CREATE INDEX IF NOT EXISTS measurements_location_lookup ON measurements(kind, node_id, received_at DESC, id DESC) WHERE kind IN ('position', 'map_report');");
+    execute("CREATE INDEX IF NOT EXISTS logical_packets_status_lookup ON logical_packets(packet_type, sender, id);");
+    execute("CREATE INDEX IF NOT EXISTS observations_packet_time ON observations(logical_packet_id, observed_at DESC);");
+    execute("CREATE INDEX IF NOT EXISTS logical_status_sender_payload ON logical_packets(packet_type, sender, logical_payload);");
     prepare("INSERT OR IGNORE INTO logical_packets(packet_key, sender, destination, mesh_packet_id, channel, packet_type, logical_payload, decoded_payload_hex, first_seen, last_seen) VALUES(?,?,?,?,?,?,?,?,?,?)", &logical_insert_);
     prepare("UPDATE logical_packets SET last_seen = ?, packet_type = ?, decoded_payload_hex = ? WHERE packet_key = ?", &logical_update_);
     prepare("SELECT id FROM logical_packets WHERE packet_key = ?", &logical_select_);
