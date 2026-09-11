@@ -27,6 +27,32 @@ TEST(ParserTest, ParsesJsonTextAndTopicMetadata) {
     EXPECT_EQ(packet.measurement->text, "hello mesh");
 }
 
+TEST(ParserTest, ParsesJsonFieldsWithoutMatchingNestedKeys) {
+    const std::string payload = R"({"nested":{"type":"wrong","text":"wrong"},"type":"text","text":"right"})";
+    const ParsedPacket packet = parse_packet("msh/SE/2/json/LongFast", payload.data(), static_cast<int>(payload.size()));
+
+    EXPECT_EQ(packet.packet_type, "text");
+    ASSERT_TRUE(packet.measurement.has_value());
+    EXPECT_EQ(packet.measurement->text, "right");
+}
+
+TEST(ParserTest, DecodesJsonStringEscapes) {
+    const std::string payload = R"({"type":"text","text":"line\nquote: \"mesh\" unicode: \u263A"})";
+    const ParsedPacket packet = parse_packet("msh/SE/2/json/LongFast", payload.data(), static_cast<int>(payload.size()));
+
+    ASSERT_TRUE(packet.measurement.has_value());
+    EXPECT_EQ(packet.measurement->text, "line\nquote: \"mesh\" unicode: \xE2\x98\xBA");
+}
+
+TEST(ParserTest, IgnoresMalformedJsonMetadata) {
+    const std::string payload = R"({"nested":{"type":"wrong"},"type":"text","text":"unterminated})";
+    const ParsedPacket packet = parse_packet("msh/SE/2/json/LongFast", payload.data(), static_cast<int>(payload.size()));
+
+    EXPECT_TRUE(packet.packet_type.empty());
+    EXPECT_TRUE(packet.sender.empty());
+    EXPECT_FALSE(packet.measurement.has_value());
+}
+
 TEST(ParserTest, ParsesJsonTelemetryMeasurements) {
     const std::string payload = R"({"type":"telemetry","sender":"!12345678","batteryLevel":87,"voltage":4.1,"temperature":21.5,"relativeHumidity":48.0,"barometricPressure":1012.3})";
     const ParsedPacket packet = parse_packet("msh/NO/2/json/LongFast", payload.data(), static_cast<int>(payload.size()));

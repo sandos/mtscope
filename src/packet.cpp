@@ -4,6 +4,10 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <map>
+#include <optional>
+#include <stdexcept>
+#include <string_view>
 #include <vector>
 
 #include "meshtastic/mqtt.pb.h"
@@ -56,35 +60,213 @@ std::vector<std::string> split_topic(const std::string& topic) {
     return parts;
 }
 
-std::string json_field(const std::string& json, const std::string& name) {
-    const std::string key = "\"" + name + "\"";
-    size_t key_position = json.find(key);
-    while (key_position != std::string::npos) {
-        size_t separator = key_position + key.size();
-        while (separator < json.size() && std::isspace(static_cast<unsigned char>(json[separator]))) ++separator;
-        if (separator < json.size() && json[separator] == ':') break;
-        key_position = json.find(key, key_position + 1);
+struct JsonValue {
+    enum class Type { String, Number, Boolean, Null, Object, Array };
+    Type type;
+    std::string text;
+    std::map<std::string, JsonValue> object;
+};
+
+void append_codepoint(std::string& output, unsigned int codepoint) {
+    if (codepoint <= 0x7f) {
+        output += static_cast<char>(codepoint);
+    } else if (codepoint <= 0x7ff) {
+        output += static_cast<char>(0xc0 | (codepoint >> 6));
+        output += static_cast<char>(0x80 | (codepoint & 0x3f));
+    } else if (codepoint <= 0xffff) {
+        output += static_cast<char>(0xe0 | (codepoint >> 12));
+        output += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f));
+        output += static_cast<char>(0x80 | (codepoint & 0x3f));
+    } else {
+        output += static_cast<char>(0xf0 | (codepoint >> 18));
+        output += static_cast<char>(0x80 | ((codepoint >> 12) & 0x3f));
+        output += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f));
+        output += static_cast<char>(0x80 | (codepoint & 0x3f));
     }
-    if (key_position == std::string::npos) return {};
-    size_t value_position = json.find(':', key_position + key.size());
-    if (value_position == std::string::npos) return {};
-    ++value_position;
-    while (value_position < json.size() && std::isspace(static_cast<unsigned char>(json[value_position]))) ++value_position;
-    if (value_position >= json.size()) return {};
-    if (json[value_position] == '"') {
-        std::string value;
-        for (size_t index = value_position + 1; index < json.size(); ++index) {
-            if (json[index] == '"') return value;
-            if (json[index] == '\\' && index + 1 < json.size()) ++index;
-            value += json[index];
+}
+
+class JsonParser {
+public:
+    explicit JsonParser(std::string_view input) : input_(input) {}
+
+    std::optional<JsonValue> parse() {
+        try {
+            skip_space();
+            JsonValue value = parse_value();
+            skip_space();
+            if (position_ != input_.size()) throw std::runtime_error("trailing JSON");
+            return value;
+        } catch (const std::runtime_error&) {
+            return std::nullopt;
         }
-        return {};
     }
-    const size_t end = json.find_first_of(",}", value_position);
-    const std::string value = json.substr(value_position, end == std::string::npos ? end : end - value_position);
-    const size_t first = value.find_first_not_of(" \t\r\n");
-    const size_t last = value.find_last_not_of(" \t\r\n");
-    return first == std::string::npos ? std::string{} : value.substr(first, last - first + 1);
+
+private:
+    static bool is_digit(char character) { return character >= '0' && character <= '9'; }
+
+    char consume() {
+        if (position_ >= input_.size()) throw std::runtime_error("unexpected end");
+        return input_[position_++];
+    }
+
+    void expect(char expected) {
+        if (consume() != expected) throw std::runtime_error("unexpected character");
+    }
+
+    void skip_space() {
+        while (position_ < input_.size() && (input_[position_] == ' ' || input_[position_] == '\t' ||
+            input_[position_] == '\r' || input_[position_] == '\n')) ++position_;
+    }
+
+    unsigned int parse_hex() {
+        unsigned int value = 0;
+        for (int index = 0; index < 4; ++index) {
+            const char character = consume();
+            value <<= 4;
+            if (character >= '0' && character <= '9') value += static_cast<unsigned int>(character - '0');
+            else if (character >= 'a' && character <= 'f') value += static_cast<unsigned int>(character - 'a' + 10);
+            else if (character >= 'A' && character <= 'F') value += static_cast<unsigned int>(character - 'A' + 10);
+            else throw std::runtime_error("invalid Unicode escape");
+        }
+        return value;
+    }
+
+    std::string parse_string() {
+        expect('"');
+        std::string output;
+        while (position_ < input_.size()) {
+            const unsigned char character = static_cast<unsigned char>(consume());
+            if (character == '"') return output;
+            if (character < 0x20) throw std::runtime_error("control character in string");
+            if (character != '\\') {
+                output += static_cast<char>(character);
+                continue;
+            }
+            switch (consume()) {
+            case '"': output += '"'; break;
+            case '\\': output += '\\'; break;
+            case '/': output += '/'; break;
+            case 'b': output += '\b'; break;
+            case 'f': output += '\f'; break;
+            case 'n': output += '\n'; break;
+            case 'r': output += '\r'; break;
+            case 't': output += '\t'; break;
+            case 'u': {
+                const unsigned int high = parse_hex();
+                if (high >= 0xd800 && high <= 0xdbff) {
+                    expect('\\');
+                    expect('u');
+                    const unsigned int low = parse_hex();
+                    if (low < 0xdc00 || low > 0xdfff) throw std::runtime_error("invalid surrogate pair");
+                    append_codepoint(output, 0x10000 + ((high - 0xd800) << 10) + (low - 0xdc00));
+                } else if (high >= 0xdc00 && high <= 0xdfff) {
+                    throw std::runtime_error("unexpected low surrogate");
+                } else {
+                    append_codepoint(output, high);
+                }
+                break;
+            }
+            default: throw std::runtime_error("invalid string escape");
+            }
+        }
+        throw std::runtime_error("unterminated string");
+    }
+
+    JsonValue parse_number() {
+        const size_t start = position_;
+        if (input_[position_] == '-') ++position_;
+        if (position_ >= input_.size()) throw std::runtime_error("invalid number");
+        if (input_[position_] == '0') {
+            ++position_;
+            if (position_ < input_.size() && is_digit(input_[position_])) throw std::runtime_error("leading zero");
+        } else {
+            if (input_[position_] < '1' || input_[position_] > '9') throw std::runtime_error("invalid number");
+            while (position_ < input_.size() && is_digit(input_[position_])) ++position_;
+        }
+        if (position_ < input_.size() && input_[position_] == '.') {
+            ++position_;
+            if (position_ >= input_.size() || !is_digit(input_[position_])) throw std::runtime_error("invalid fraction");
+            while (position_ < input_.size() && is_digit(input_[position_])) ++position_;
+        }
+        if (position_ < input_.size() && (input_[position_] == 'e' || input_[position_] == 'E')) {
+            ++position_;
+            if (position_ < input_.size() && (input_[position_] == '+' || input_[position_] == '-')) ++position_;
+            if (position_ >= input_.size() || !is_digit(input_[position_])) throw std::runtime_error("invalid exponent");
+            while (position_ < input_.size() && is_digit(input_[position_])) ++position_;
+        }
+        return {JsonValue::Type::Number, std::string(input_.substr(start, position_ - start)), {}};
+    }
+
+    JsonValue parse_value() {
+        skip_space();
+        if (position_ >= input_.size()) throw std::runtime_error("missing value");
+        switch (input_[position_]) {
+        case '"': return {JsonValue::Type::String, parse_string(), {}};
+        case '{': return parse_object();
+        case '[': return parse_array();
+        case 't': return parse_literal("true", JsonValue::Type::Boolean);
+        case 'f': return parse_literal("false", JsonValue::Type::Boolean);
+        case 'n': return parse_literal("null", JsonValue::Type::Null);
+        default: return parse_number();
+        }
+    }
+
+    JsonValue parse_literal(std::string_view literal, JsonValue::Type type) {
+        if (input_.substr(position_, literal.size()) != literal) throw std::runtime_error("invalid literal");
+        position_ += literal.size();
+        return {type, std::string(literal), {}};
+    }
+
+    JsonValue parse_object() {
+        expect('{');
+        JsonValue value{JsonValue::Type::Object, {}, {}};
+        skip_space();
+        if (position_ < input_.size() && input_[position_] == '}') {
+            ++position_;
+            return value;
+        }
+        while (true) {
+            skip_space();
+            const std::string key = parse_string();
+            skip_space();
+            expect(':');
+            JsonValue member = parse_value();
+            if (!value.object.emplace(key, std::move(member)).second) throw std::runtime_error("duplicate key");
+            skip_space();
+            const char separator = consume();
+            if (separator == '}') return value;
+            if (separator != ',') throw std::runtime_error("invalid object");
+        }
+    }
+
+    JsonValue parse_array() {
+        expect('[');
+        skip_space();
+        if (position_ < input_.size() && input_[position_] == ']') {
+            ++position_;
+            return {JsonValue::Type::Array, {}, {}};
+        }
+        while (true) {
+            parse_value();
+            skip_space();
+            const char separator = consume();
+            if (separator == ']') return {JsonValue::Type::Array, {}, {}};
+            if (separator != ',') throw std::runtime_error("invalid array");
+        }
+    }
+
+    std::string_view input_;
+    size_t position_ = 0;
+};
+
+std::string json_field(const std::string& json, const std::string& name) {
+    const auto document = JsonParser(json).parse();
+    if (!document || document->type != JsonValue::Type::Object) return {};
+    const auto field = document->object.find(name);
+    if (field == document->object.end()) return {};
+    if (field->second.type == JsonValue::Type::String || field->second.type == JsonValue::Type::Number ||
+        field->second.type == JsonValue::Type::Boolean) return field->second.text;
+    return {};
 }
 
 std::optional<double> json_number(const std::string& json, const std::string& name) {
