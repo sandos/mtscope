@@ -24,8 +24,18 @@ TEST(DatabaseTest, DoesNotGroupRepeatedPacketsWithoutMeshIds) {
     ASSERT_TRUE(database.insert("msh/SE/2/stat/!abcd1234", payload.data(), static_cast<int>(payload.size())));
 
     const std::string recent = database.recent_json();
-    EXPECT_EQ(recent.find("\"observation_count\":2"), std::string::npos);
-    EXPECT_NE(recent.find("\"observation_count\":1"), std::string::npos);
+    EXPECT_EQ(recent, "[]");
+}
+
+TEST(DatabaseTest, OnlineStatusKeepsKnownNodeVisible) {
+    Database database(":memory:");
+    const std::string nodeinfo = R"({"type":"nodeinfo","sender":"!abcd1234","longName":"Mesh node","shortName":"MN"})";
+    const std::string online = "online";
+
+    ASSERT_TRUE(database.insert("msh/SE/2/json/LongFast/!abcd1234", nodeinfo.data(), static_cast<int>(nodeinfo.size())));
+    ASSERT_TRUE(database.insert("msh/SE/2/stat/!abcd1234", online.data(), static_cast<int>(online.size())));
+
+    EXPECT_NE(database.nodes_json().find("!abcd1234"), std::string::npos);
 }
 
 TEST(DatabaseTest, PurgesExpiredObservationsAndDependentData) {
