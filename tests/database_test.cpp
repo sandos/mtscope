@@ -27,3 +27,17 @@ TEST(DatabaseTest, DoesNotGroupRepeatedPacketsWithoutMeshIds) {
     EXPECT_EQ(recent.find("\"observation_count\":2"), std::string::npos);
     EXPECT_NE(recent.find("\"observation_count\":1"), std::string::npos);
 }
+
+TEST(DatabaseTest, PurgesExpiredObservationsAndDependentData) {
+    Database database(":memory:");
+    const std::string payload = R"({"type":"nodeinfo","sender":"!abcd1234","longName":"Mesh node","shortName":"MN"})";
+
+    ASSERT_TRUE(database.insert("msh/SE/2/json/LongFast/!abcd1234", payload.data(), static_cast<int>(payload.size())));
+    EXPECT_NE(database.recent_json(), "[]");
+    EXPECT_NE(database.nodes_json(), "[]");
+
+    database.purge(-1);
+
+    EXPECT_EQ(database.recent_json(), "[]");
+    EXPECT_EQ(database.nodes_json(), "[]");
+}
