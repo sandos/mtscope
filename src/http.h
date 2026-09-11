@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "stats.h"
+
 class Database;
 class Monitor;
 
@@ -19,5 +21,6 @@ private:
 	std::string index_;
 	std::string stylesheet_;
 	std::string script_;
+	mutable ResourceStats resource_stats_;
 	int server_ = -1;
 };

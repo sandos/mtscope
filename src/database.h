@@ -22,6 +22,7 @@ public:
     std::string recent_json();
     std::string observations_json(const std::string& packet_key);
     std::string nodes_json();
+    std::string stats_json();
 
 private:
     bool insert_measurement(std::int64_t logical_packet_id, std::int64_t received_at, const Measurement& measurement);

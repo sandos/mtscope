@@ -28,10 +28,34 @@ test('shows the empty monitor dashboard', async ({ page, request }) => {
   expect(nodesResponse.ok()).toBeTruthy();
   await expect(nodesResponse.json()).resolves.toEqual([]);
 
+  const statsResponse = await request.get('/api/stats');
+  expect(statsResponse.ok()).toBeTruthy();
+  await expect(statsResponse.json()).resolves.toMatchObject({
+    database_bytes: expect.any(Number),
+    logical_packets: 0,
+    observations: 0,
+    measurements: 0,
+    known_nodes: 0,
+    first_observed_at: null,
+    last_observed_at: null,
+    host_ram_used_bytes: expect.any(Number),
+    host_ram_total_bytes: expect.any(Number),
+    process_ram_bytes: expect.any(Number),
+  });
+
   await page.getByRole('tab', { name: 'Nodes' }).click();
   await expect(page.getByRole('columnheader', { name: 'Node ID' })).toBeVisible();
   await expect(page.getByLabel('Filter nodes')).toBeVisible();
   await expect(page.getByText('No nodeinfo packets received yet')).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Stats' }).click();
+  await expect(page.getByRole('heading', { name: 'Monitor', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Host' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Storage and data' })).toBeVisible();
+  await expect(page.getByText('Database size')).toBeVisible();
+  await expect(page.locator('#monitor-stats').getByText('CPU usage')).toBeVisible();
+  await expect(page.locator('#host-stats').getByText('RAM usage')).toBeVisible();
+  await expect(page.getByText('Logical packets', { exact: true })).toBeVisible();
 });
 
 test('keeps the dashboard usable on mobile', async ({ page }) => {
@@ -58,6 +82,9 @@ test('supports keyboard navigation and filtering shortcuts', async ({ page }) =>
 
   await page.keyboard.press('1');
   await expect(page.locator('#packets-panel')).toBeVisible();
+
+  await page.keyboard.press('3');
+  await expect(page.locator('#stats-panel')).toBeVisible();
 });
 
 test('keeps node coordinate columns balanced when status is hidden', async ({ page }) => {

@@ -5,6 +5,10 @@ const packetPanel = document.querySelector('#packets-panel');
 const nodePanel = document.querySelector('#nodes-panel');
 const packetFilter = document.querySelector('#packet-filter');
 const nodeFilter = document.querySelector('#node-filter');
+const statsPanel = document.querySelector('#stats-panel');
+const monitorStatsBody = document.querySelector('#monitor-stats');
+const hostStatsBody = document.querySelector('#host-stats');
+const databaseStatsBody = document.querySelector('#database-stats');
 const showStatus = document.querySelector('#show-status');
 const statusColumn = document.querySelector('.node-status-column');
 const connectionStatus = document.querySelector('#connection-status');
@@ -128,16 +132,51 @@ function renderNodes() {
   nodeBody.innerHTML = nodes.map(node => `<tr><td><code>${esc(node.node_id)}</code></td><td>${esc(node.long_name) || missing()}</td><td>${esc(node.short_name)}</td><td class="node-hardware">${esc(node.hardware_model) || missing()}</td><td>${esc(node.role) || missing()}</td><td class="node-status" data-column="status"${showStatus.checked ? '' : ' hidden'}>${nodeStatus(node)}</td><td class="node-latitude">${coordinate(node.latitude)}</td><td class="node-longitude">${coordinate(node.longitude)}</td><td class="node-altitude">${altitude(node.altitude)}</td><td class="node-map">${mapLink(node)}</td><td>${new Date(node.last_seen * 1000).toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="11" class="muted">No nodeinfo packets received yet</td></tr>';
 }
 
+function bytes(value) {
+  if (value == null) return '--';
+  const units = ['B', 'KiB', 'MiB', 'GiB'];
+  let size = Number(value);
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1; }
+  return `${size.toLocaleString(undefined, { maximumFractionDigits: unit ? 1 : 0 })} ${units[unit]}`;
+}
+function percent(value) { return value == null ? '--' : `${Number(value).toFixed(1)}%`; }
+function date(value) { return value == null ? '--' : new Date(value * 1000).toLocaleString(); }
+function renderStatItems(container, items) {
+  container.innerHTML = items.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('');
+}
+function renderStats(stats) {
+  renderStatItems(monitorStatsBody, [
+    ['CPU usage', percent(stats.process_cpu_usage_percent)],
+    ['RAM usage', bytes(stats.process_ram_bytes)],
+  ]);
+  renderStatItems(hostStatsBody, [
+    ['CPU usage', percent(stats.host_cpu_usage_percent)],
+    ['RAM usage', `${bytes(stats.host_ram_used_bytes)} / ${bytes(stats.host_ram_total_bytes)}`],
+  ]);
+  renderStatItems(databaseStatsBody, [
+    ['Database size', bytes(stats.database_bytes)],
+    ['Logical packets', Number(stats.logical_packets).toLocaleString()],
+    ['Observations', Number(stats.observations).toLocaleString()],
+    ['Decoded measurements', Number(stats.measurements).toLocaleString()],
+    ['Known nodes', Number(stats.known_nodes).toLocaleString()],
+    ['First observation', date(stats.first_observed_at)],
+    ['Latest observation', date(stats.last_observed_at)],
+  ]);
+}
+
 function showTab(name) {
-  const showNodes = name === 'nodes';
-  packetPanel.hidden = showNodes;
-  nodePanel.hidden = !showNodes;
-  document.querySelector('#packets-tab').setAttribute('aria-selected', String(!showNodes));
-  document.querySelector('#nodes-tab').setAttribute('aria-selected', String(showNodes));
+  packetPanel.hidden = name !== 'packets';
+  nodePanel.hidden = name !== 'nodes';
+  statsPanel.hidden = name !== 'stats';
+  document.querySelector('#packets-tab').setAttribute('aria-selected', String(name === 'packets'));
+  document.querySelector('#nodes-tab').setAttribute('aria-selected', String(name === 'nodes'));
+  document.querySelector('#stats-tab').setAttribute('aria-selected', String(name === 'stats'));
 }
 
 document.querySelector('#packets-tab').addEventListener('click', () => showTab('packets'));
 document.querySelector('#nodes-tab').addEventListener('click', () => showTab('nodes'));
+document.querySelector('#stats-tab').addEventListener('click', () => showTab('stats'));
 packetBody.addEventListener('click', event => {
   const link = event.target.closest('a[data-node-id]');
   if (!link) return;
@@ -182,6 +221,9 @@ document.addEventListener('keydown', event => {
   } else if (event.key === '2') {
     event.preventDefault();
     showTab('nodes');
+  } else if (event.key === '3') {
+    event.preventDefault();
+    showTab('stats');
   } else if (event.key === '/') {
     event.preventDefault();
     (packetPanel.hidden ? nodeFilter : packetFilter).focus();
@@ -201,11 +243,12 @@ async function load() {
   connectionStatus.setAttribute('aria-label', 'Refreshing monitor data');
   connectionStatus.title = 'Refreshing monitor data';
   try {
-    const [packets, nodes, monitorStatus] = await Promise.all([fetch('api/packets').then(response => response.json()), fetch('api/nodes').then(response => response.json()), fetch('api/status').then(response => response.json())]);
+    const [packets, nodes, stats, monitorStatus] = await Promise.all([fetch('api/packets').then(response => response.json()), fetch('api/nodes').then(response => response.json()), fetch('api/stats').then(response => response.json()), fetch('api/status').then(response => response.json())]);
     tableState.packets.items = groupPackets(packets);
     tableState.nodes.items = nodes;
     renderPackets();
     renderNodes();
+    renderStats(stats);
     updateSortIndicators();
     statusText.textContent = `${tableState.packets.items.length} logical packets · ${nodes.length} seen nodes`;
     connectionStatus.className = 'connection-status connected';

@@ -38,6 +38,20 @@ TEST(DatabaseTest, OnlineStatusKeepsKnownNodeVisible) {
     EXPECT_NE(database.nodes_json().find("!abcd1234"), std::string::npos);
 }
 
+TEST(DatabaseTest, ReportsDatabaseStatistics) {
+    Database database(":memory:");
+    const std::string payload = R"({"type":"nodeinfo","sender":"!abcd1234","longName":"Mesh node","shortName":"MN"})";
+
+    ASSERT_TRUE(database.insert("msh/SE/2/json/LongFast/!abcd1234", payload.data(), static_cast<int>(payload.size())));
+
+    const std::string stats = database.stats_json();
+    EXPECT_NE(stats.find("\"database_bytes\":"), std::string::npos);
+    EXPECT_NE(stats.find("\"logical_packets\":1"), std::string::npos);
+    EXPECT_NE(stats.find("\"observations\":1"), std::string::npos);
+    EXPECT_NE(stats.find("\"measurements\":1"), std::string::npos);
+    EXPECT_NE(stats.find("\"known_nodes\":1"), std::string::npos);
+}
+
 TEST(DatabaseTest, PurgesExpiredObservationsAndDependentData) {
     Database database(":memory:");
     const std::string payload = R"({"type":"nodeinfo","sender":"!abcd1234","longName":"Mesh node","shortName":"MN"})";

@@ -55,6 +55,7 @@ set(MESHTAT_MONITOR_SOURCES
 	src/database.cpp
 	src/monitor.cpp
 	src/http.cpp
+	src/stats.cpp
 )
 
 add_executable(meshat-monitor ${MESHTAT_MONITOR_SOURCES} ${MESHTASTIC_PROTO_SOURCES})

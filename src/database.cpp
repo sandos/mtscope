@@ -256,6 +256,21 @@ std::string Database::nodes_json() {
     return result + "]";
 }
 
+std::string Database::stats_json() {
+    constexpr const char* sql = "SELECT (SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()), (SELECT COUNT(*) FROM logical_packets), (SELECT COUNT(*) FROM observations), (SELECT COUNT(*) FROM measurements), (SELECT COUNT(DISTINCT node_id) FROM measurements WHERE kind = 'nodeinfo' AND node_id <> ''), (SELECT MIN(observed_at) FROM observations), (SELECT MAX(observed_at) FROM observations)";
+    std::lock_guard<std::mutex> lock(mutex_);
+    sqlite3_stmt* statement = nullptr;
+    if (sqlite3_prepare_v2(db_, sql, -1, &statement, nullptr) != SQLITE_OK) throw_query_error(db_, "database stats query");
+    if (sqlite3_step(statement) != SQLITE_ROW) {
+        sqlite3_finalize(statement);
+        throw_query_error(db_, "database stats query");
+    }
+    const auto optional_integer = [&](int column) { return sqlite3_column_type(statement, column) == SQLITE_NULL ? std::string("null") : std::to_string(sqlite3_column_int64(statement, column)); };
+    const std::string result = "{\"database_bytes\":" + optional_integer(0) + ",\"logical_packets\":" + optional_integer(1) + ",\"observations\":" + optional_integer(2) + ",\"measurements\":" + optional_integer(3) + ",\"known_nodes\":" + optional_integer(4) + ",\"first_observed_at\":" + optional_integer(5) + ",\"last_observed_at\":" + optional_integer(6) + "}";
+    sqlite3_finalize(statement);
+    return result;
+}
+
 bool Database::insert_measurement(std::int64_t logical_packet_id, std::int64_t received_at, const Measurement& measurement) {
     sqlite3_reset(measurement_insert_);
     sqlite3_clear_bindings(measurement_insert_);

@@ -69,6 +69,12 @@ void HttpServer::serve(Database& database, const Monitor& monitor) const {
                 send_response(client, 200, "OK", "application/json", database.observations_json(line.substr(prefix, suffix - prefix)));
             } else if (line.rfind("GET /api/packets ", 0) == 0) send_response(client, 200, "OK", "application/json", database.recent_json());
             else if (line.rfind("GET /api/nodes ", 0) == 0) send_response(client, 200, "OK", "application/json", database.nodes_json());
+            else if (line.rfind("GET /api/stats ", 0) == 0) {
+                std::string stats = database.stats_json();
+                stats.pop_back();
+                stats += "," + resource_stats_.json() + "}";
+                send_response(client, 200, "OK", "application/json", stats);
+            }
             else if (line.rfind("GET /api/status ", 0) == 0) send_response(client, 200, "OK", "application/json", monitor.connected() ? "{\"mqtt_connected\":true}" : "{\"mqtt_connected\":false}");
             else if (line.rfind("GET /styles.css ", 0) == 0) send_response(client, 200, "OK", "text/css", stylesheet_);
             else if (line.rfind("GET /app.js ", 0) == 0) send_response(client, 200, "OK", "application/javascript", script_);
