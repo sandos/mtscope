@@ -14,6 +14,7 @@ const statusColumn = document.querySelector('.node-status-column');
 const connectionStatus = document.querySelector('#connection-status');
 const mqttStatus = document.querySelector('#mqtt-status');
 const statusText = document.querySelector('#status-text');
+const maxVisiblePackets = 600;
 const tableState = {
   packets: { items: [], filter: '', sortKey: null, descending: false },
   nodes: { items: [], filter: '', sortKey: null, descending: false },
@@ -244,7 +245,7 @@ async function load() {
   connectionStatus.title = 'Refreshing monitor data';
   try {
     const [packets, nodes, stats, monitorStatus] = await Promise.all([fetch('api/packets').then(response => response.json()), fetch('api/nodes').then(response => response.json()), fetch('api/stats').then(response => response.json()), fetch('api/status').then(response => response.json())]);
-    tableState.packets.items = groupPackets(packets);
+    tableState.packets.items = groupPackets(packets).slice(0, maxVisiblePackets);
     tableState.nodes.items = nodes;
     renderPackets();
     renderNodes();
