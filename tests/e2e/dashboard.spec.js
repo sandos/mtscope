@@ -56,6 +56,14 @@ test('shows the empty monitor dashboard', async ({ page, request }) => {
   await expect(page.locator('#monitor-stats').getByText('CPU usage')).toBeVisible();
   await expect(page.locator('#host-stats').getByText('RAM usage')).toBeVisible();
   await expect(page.getByText('Logical packets', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'API response times' })).toBeVisible();
+  await expect(page.locator('#http-client-stats')).toContainText('receive timeouts');
+
+  const logsResponse = await request.get('/api/logs');
+  expect(logsResponse.ok()).toBeTruthy();
+  await expect(logsResponse.json()).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ source: 'HTTP' })]));
+  await page.getByRole('tab', { name: 'Logs' }).click();
+  await expect(page.locator('#logs')).toBeVisible();
 });
 
 test('keeps the dashboard usable on mobile', async ({ page }) => {

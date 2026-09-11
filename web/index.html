@@ -14,6 +14,7 @@
       <button id="packets-tab" role="tab" aria-selected="true" aria-controls="packets-panel">Packets</button>
       <button id="nodes-tab" role="tab" aria-selected="false" aria-controls="nodes-panel">Nodes</button>
       <button id="stats-tab" role="tab" aria-selected="false" aria-controls="stats-panel">Stats</button>
+      <button id="logs-tab" role="tab" aria-selected="false" aria-controls="logs-panel">Logs</button>
     </nav>
     <section id="packets-panel" role="tabpanel" aria-labelledby="packets-tab">
       <label class="filter">Filter packets <input id="packet-filter" type="search" placeholder="Topic, node, packet, sender, or detail"></label>
@@ -37,6 +38,14 @@
         <h2 id="database-stats-heading">Storage and data</h2>
         <dl id="database-stats" class="stats-grid"></dl>
       </section>
+      <section class="stats-section" aria-labelledby="api-stats-heading">
+        <h2 id="api-stats-heading">API response times</h2>
+        <div id="api-stats" class="api-stats"></div>
+        <div id="http-client-stats" class="client-stats"></div>
+      </section>
+    </section>
+    <section id="logs-panel" role="tabpanel" aria-labelledby="logs-tab" hidden>
+      <div id="logs" class="logs" aria-live="polite"></div>
     </section>
   </main>
   <script src="app.js"></script>

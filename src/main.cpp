@@ -2,6 +2,7 @@
 #include "config.h"
 #include "database.h"
 #include "http.h"
+#include "logger.h"
 #include "monitor.h"
 
 #include <chrono>
@@ -55,9 +56,10 @@ int main(int argc, char** argv) {
         std::signal(SIGINT, stop);
         std::signal(SIGTERM, stop);
         Database database(config.database);
+        Logger logger;
         database.purge(config.retention_days);
-        HttpServer web_server(config.http_port, config.web_root);
-        Monitor monitor(config, database);
+        HttpServer web_server(config.http_port, config.web_root, logger);
+        Monitor monitor(config, database, logger);
         std::thread web([&] { web_server.serve(database, monitor); });
         try {
             monitor.run();

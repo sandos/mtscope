@@ -15,6 +15,15 @@ cmake --build --preset release
 ./build/release/meshat-monitor --database ./meshat-monitor.db --topic 'msh/#' --retention-days 3
 ```
 
+To test the broker/client connection without SQLite, HTTP, or packet decoding, run the standalone probe:
+
+```sh
+MQTT_HOST=mqtt.meshat.se MQTT_PORT=1883 MQTT_TOPIC='msh/#' \
+	./build/release/mqtt-probe
+```
+
+It accepts `host`, `port`, `topic`, and duration in seconds as positional arguments. Credentials are read from `MQTT_USERNAME` and `MQTT_PASSWORD`. Compare its disconnect count with the monitor over the same interval; a clean probe alongside disconnecting monitor points to work in the monitor's MQTT callback, especially the synchronous database insert.
+
 The Meshtastic protobuf definitions are included as the `protobufs/` git submodule. For an existing checkout, initialize it with `git submodule update --init --recursive`.
 
 Open `http://localhost:8099`. Use `--topic` to narrow the subscription, for example `msh/SE/2/json/#`.
@@ -53,6 +62,7 @@ The tests start the locally built monitor on port `18099` with an isolated datab
 - SQLite is configured with WAL and `synchronous=NORMAL` to keep writes inexpensive.
 - Inserts and retention deletes are prepared statements, and the time index makes purging bounded by expired data.
 - Only the latest 500 packets are queried by the dashboard; MQTT data is never retained in application memory.
+- The monitor uses a unique MQTT client ID per process (`meshat-monitor-<pid>`). A fixed client ID causes brokers to disconnect an existing session whenever another monitor instance connects with the same ID.
 - Topic metadata and common JSON fields (`type`, `$typeName`, `sender`, and `channel`) are parsed into SQLite columns. Binary or encrypted payloads remain stored and displayed as hexadecimal when they cannot be decoded.
 - When built with OpenSSL, encrypted packets are tried against Meshtastic's public default channel key (the firmware's `AQ==` key alias). Decrypted text, position, node-info, and telemetry packets use the same normalized measurements path. Private channel keys and direct-message PKC decryption are not attempted.
 - Decoded application data is also inserted into `measurements`, linked to `logical_packets`. It currently normalizes text, position, node info, and telemetry fields such as battery, voltage, temperature, humidity, and pressure.

@@ -5,11 +5,12 @@
 #include <atomic>
 
 class Database;
+class Logger;
 struct mosquitto;
 
 class Monitor {
 public:
-    Monitor(const Config& config, Database& database);
+    Monitor(const Config& config, Database& database, Logger& logger);
     ~Monitor();
 
     Monitor(const Monitor&) = delete;
@@ -25,6 +26,7 @@ private:
 
     const Config& config_;
     Database& database_;
+    Logger& logger_;
     mosquitto* client_ = nullptr;
     std::atomic<bool> connected_{false};
 };

@@ -56,6 +56,7 @@ set(MESHTAT_MONITOR_SOURCES
 	src/monitor.cpp
 	src/http.cpp
 	src/stats.cpp
+	src/logger.cpp
 )
 
 add_executable(meshat-monitor ${MESHTAT_MONITOR_SOURCES} ${MESHTASTIC_PROTO_SOURCES})
@@ -67,6 +68,11 @@ if(OpenSSL_FOUND)
 	target_compile_definitions(meshat-monitor PRIVATE MTSCOPE_HAVE_OPENSSL=1)
 endif()
 target_compile_options(meshat-monitor PRIVATE -Wall -Wextra -Wpedantic)
+
+add_executable(mqtt-probe tests/mqtt_probe.cpp)
+target_include_directories(mqtt-probe PRIVATE ${MOSQUITTO_INCLUDE_DIR})
+target_link_libraries(mqtt-probe PRIVATE ${MOSQUITTO_LIBRARY})
+target_compile_options(mqtt-probe PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS meshat-monitor RUNTIME DESTINATION bin)
 install(DIRECTORY web/ DESTINATION share/meshat-monitor)

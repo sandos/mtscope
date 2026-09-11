@@ -6,9 +6,13 @@ const nodePanel = document.querySelector('#nodes-panel');
 const packetFilter = document.querySelector('#packet-filter');
 const nodeFilter = document.querySelector('#node-filter');
 const statsPanel = document.querySelector('#stats-panel');
+const logsPanel = document.querySelector('#logs-panel');
+const logsBody = document.querySelector('#logs');
 const monitorStatsBody = document.querySelector('#monitor-stats');
 const hostStatsBody = document.querySelector('#host-stats');
 const databaseStatsBody = document.querySelector('#database-stats');
+const apiStatsBody = document.querySelector('#api-stats');
+const httpClientStatsBody = document.querySelector('#http-client-stats');
 const showStatus = document.querySelector('#show-status');
 const statusColumn = document.querySelector('.node-status-column');
 const connectionStatus = document.querySelector('#connection-status');
@@ -164,20 +168,28 @@ function renderStats(stats) {
     ['First observation', date(stats.first_observed_at)],
     ['Latest observation', date(stats.last_observed_at)],
   ]);
+  apiStatsBody.innerHTML = stats.api_timings.map(timing => `<div class="api-stat"><strong>${esc(timing.route)}</strong><span>${Number(timing.calls).toLocaleString()} calls</span><span>avg ${Number(timing.average_ms).toFixed(2)} ms</span><span>last ${Number(timing.last_ms).toFixed(2)} ms</span><span>max ${Number(timing.max_ms).toFixed(2)} ms</span></div>`).join('') || '<p class="muted">No API calls recorded yet</p>';
+  httpClientStatsBody.innerHTML = `<strong>HTTP clients</strong><span>${Number(stats.http_clients.connections).toLocaleString()} connections</span><span>${Number(stats.http_clients.disconnections).toLocaleString()} closed</span><span>${Number(stats.http_clients.receive_timeouts).toLocaleString()} receive timeouts</span>`;
+}
+function renderLogs(logs) {
+  logsBody.innerHTML = logs.map(log => `<div class="log-entry"><time>${esc(new Date(log.timestamp * 1000).toLocaleString())}</time><strong>${esc(log.source)}</strong><span>${esc(log.message)}</span></div>`).join('') || '<p class="muted">No events recorded yet</p>';
 }
 
 function showTab(name) {
   packetPanel.hidden = name !== 'packets';
   nodePanel.hidden = name !== 'nodes';
   statsPanel.hidden = name !== 'stats';
+  logsPanel.hidden = name !== 'logs';
   document.querySelector('#packets-tab').setAttribute('aria-selected', String(name === 'packets'));
   document.querySelector('#nodes-tab').setAttribute('aria-selected', String(name === 'nodes'));
   document.querySelector('#stats-tab').setAttribute('aria-selected', String(name === 'stats'));
+  document.querySelector('#logs-tab').setAttribute('aria-selected', String(name === 'logs'));
 }
 
 document.querySelector('#packets-tab').addEventListener('click', () => showTab('packets'));
 document.querySelector('#nodes-tab').addEventListener('click', () => showTab('nodes'));
 document.querySelector('#stats-tab').addEventListener('click', () => showTab('stats'));
+document.querySelector('#logs-tab').addEventListener('click', () => showTab('logs'));
 packetBody.addEventListener('click', event => {
   const link = event.target.closest('a[data-node-id]');
   if (!link) return;
@@ -225,6 +237,9 @@ document.addEventListener('keydown', event => {
   } else if (event.key === '3') {
     event.preventDefault();
     showTab('stats');
+  } else if (event.key === '4') {
+    event.preventDefault();
+    showTab('logs');
   } else if (event.key === '/') {
     event.preventDefault();
     (packetPanel.hidden ? nodeFilter : packetFilter).focus();
@@ -244,12 +259,13 @@ async function load() {
   connectionStatus.setAttribute('aria-label', 'Refreshing monitor data');
   connectionStatus.title = 'Refreshing monitor data';
   try {
-    const [packets, nodes, stats, monitorStatus] = await Promise.all([fetch('api/packets').then(response => response.json()), fetch('api/nodes').then(response => response.json()), fetch('api/stats').then(response => response.json()), fetch('api/status').then(response => response.json())]);
+    const [packets, nodes, stats, logs, monitorStatus] = await Promise.all([fetch('api/packets').then(response => response.json()), fetch('api/nodes').then(response => response.json()), fetch('api/stats').then(response => response.json()), fetch('api/logs').then(response => response.json()), fetch('api/status').then(response => response.json())]);
     tableState.packets.items = groupPackets(packets).slice(0, maxVisiblePackets);
     tableState.nodes.items = nodes;
     renderPackets();
     renderNodes();
     renderStats(stats);
+    renderLogs(logs);
     updateSortIndicators();
     statusText.textContent = `${tableState.packets.items.length} logical packets · ${nodes.length} seen nodes`;
     connectionStatus.className = 'connection-status connected';
