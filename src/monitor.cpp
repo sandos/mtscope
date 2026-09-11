@@ -2,7 +2,9 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 
+#include "app.h"
 #include "database.h"
 #include <mosquitto.h>
 
@@ -25,9 +27,13 @@ void Monitor::run() {
     mosquitto_disconnect_callback_set(client_, on_disconnect);
     mosquitto_message_callback_set(client_, on_message);
     mosquitto_reconnect_delay_set(client_, 1, 60, true);
-    if (mosquitto_connect_async(client_, config_.host.c_str(), config_.mqtt_port, 60) != MOSQ_ERR_SUCCESS) {
-        throw std::runtime_error("Unable to connect MQTT client");
+    while (running) {
+        const int result = mosquitto_connect_async(client_, config_.host.c_str(), config_.mqtt_port, 60);
+        if (result == MOSQ_ERR_SUCCESS) break;
+        std::cerr << "Unable to start MQTT connection: " << result << " (" << mosquitto_strerror(result) << "); retrying\n";
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
+    if (!running) return;
     mosquitto_loop_start(client_);
 }
 
