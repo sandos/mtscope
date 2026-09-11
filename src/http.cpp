@@ -14,8 +14,8 @@
 
 namespace {
 
-void send_response(int client, const char* type, const std::string& body) {
-    const std::string header = "HTTP/1.1 200 OK\r\nContent-Type: " + std::string(type) + "; charset=utf-8\r\nContent-Length: " + std::to_string(body.size()) + "\r\nConnection: close\r\n\r\n";
+void send_response(int client, int status, const char* reason, const char* type, const std::string& body) {
+    const std::string header = "HTTP/1.1 " + std::to_string(status) + " " + reason + "\r\nContent-Type: " + std::string(type) + "; charset=utf-8\r\nContent-Length: " + std::to_string(body.size()) + "\r\nConnection: close\r\n\r\n";
     send(client, header.data(), header.size(), MSG_NOSIGNAL);
     send(client, body.data(), body.size(), MSG_NOSIGNAL);
 }
@@ -62,16 +62,22 @@ void HttpServer::serve(Database& database, const Monitor& monitor) const {
         char request[1024]{};
         const ssize_t size = recv(client, request, sizeof(request) - 1, 0);
         const std::string line(request, size > 0 ? static_cast<size_t>(size) : 0);
-        if (line.rfind("GET /api/packets/", 0) == 0 && line.find("/observations ") != std::string::npos) {
-            const size_t prefix = std::string("GET /api/packets/").size();
-            const size_t suffix = line.find("/observations ", prefix);
-            send_response(client, "application/json", database.observations_json(line.substr(prefix, suffix - prefix)));
-        } else if (line.rfind("GET /api/packets ", 0) == 0) send_response(client, "application/json", database.recent_json());
-        else if (line.rfind("GET /api/nodes ", 0) == 0) send_response(client, "application/json", database.nodes_json());
-        else if (line.rfind("GET /api/status ", 0) == 0) send_response(client, "application/json", monitor.connected() ? "{\"mqtt_connected\":true}" : "{\"mqtt_connected\":false}");
-        else if (line.rfind("GET /styles.css ", 0) == 0) send_response(client, "text/css", stylesheet_);
-        else if (line.rfind("GET /app.js ", 0) == 0) send_response(client, "application/javascript", script_);
-        else send_response(client, "text/html", index_);
+        try {
+            if (line.rfind("GET /api/packets/", 0) == 0 && line.find("/observations ") != std::string::npos) {
+                const size_t prefix = std::string("GET /api/packets/").size();
+                const size_t suffix = line.find("/observations ", prefix);
+                send_response(client, 200, "OK", "application/json", database.observations_json(line.substr(prefix, suffix - prefix)));
+            } else if (line.rfind("GET /api/packets ", 0) == 0) send_response(client, 200, "OK", "application/json", database.recent_json());
+            else if (line.rfind("GET /api/nodes ", 0) == 0) send_response(client, 200, "OK", "application/json", database.nodes_json());
+            else if (line.rfind("GET /api/status ", 0) == 0) send_response(client, 200, "OK", "application/json", monitor.connected() ? "{\"mqtt_connected\":true}" : "{\"mqtt_connected\":false}");
+            else if (line.rfind("GET /styles.css ", 0) == 0) send_response(client, 200, "OK", "text/css", stylesheet_);
+            else if (line.rfind("GET /app.js ", 0) == 0) send_response(client, 200, "OK", "application/javascript", script_);
+            else if (line.rfind("GET / ", 0) == 0) send_response(client, 200, "OK", "text/html", index_);
+            else send_response(client, 404, "Not Found", "application/json", "{\"error\":\"Not found\"}");
+        } catch (const std::exception& error) {
+            std::cerr << "HTTP request failed: " << error.what() << "\n";
+            send_response(client, 500, "Internal Server Error", "application/json", "{\"error\":\"Internal server error\"}");
+        }
         close(client);
     }
 }
