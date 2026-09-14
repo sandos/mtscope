@@ -128,7 +128,7 @@ if(BUILD_TESTING)
 				--errors-for-leak-kinds=definite,indirect
 				--error-exitcode=99
 				$<TARGET_FILE:meshat-monitor-tests>
-			DEPENDS meshat-monitor-tests
+			DEPENDS meshat-monitor-tests meshat-monitor
 			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 			VERBATIM
 		)

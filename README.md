@@ -73,6 +73,8 @@ For an uber-verification that runs both ASan/UBSan and Valgrind:
 ./verify.sh
 ```
 
+The uber-verification runs both the C++ tests and the Playwright browser tests under each memory checker. The Playwright server uses the corresponding ASan or Valgrind monitor binary rather than the Release binary.
+
 The SQLite schema is intentionally fresh-install-only and is not migrated. When upgrading across schema changes, stop the monitor and remove the database before restarting:
 
 ```sh
