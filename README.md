@@ -15,6 +15,17 @@ cmake --build --preset release
 ./build/release/meshat-monitor --database ./meshat-monitor.db --topic 'msh/#' --retention-days 3
 ```
 
+To measure C++ test coverage with GCC, configure and build the coverage preset, run the tests, then inspect the generated counters with `gcov`:
+
+```sh
+cmake --preset coverage
+cmake --build --preset coverage --target meshat-monitor-tests
+ctest --test-dir build/coverage --output-on-failure
+gcovr --root . --filter 'src/' --object-directory build/coverage/CMakeFiles/meshat-monitor-tests.dir/src
+```
+
+The coverage preset instruments the test executable only and keeps coverage artifacts in `build/coverage`.
+
 To test the broker/client connection without SQLite, HTTP, or packet decoding, run the standalone probe:
 
 ```sh

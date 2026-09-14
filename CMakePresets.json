@@ -9,12 +9,26 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Coverage (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/coverage",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MTSCOPE_ENABLE_COVERAGE": "ON"
+      }
     }
   ],
   "buildPresets": [
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage"
     }
   ]
 }
