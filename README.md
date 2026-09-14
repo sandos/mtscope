@@ -33,7 +33,7 @@ cmake --preset asan
 cmake --build --preset asan --target asan
 ```
 
-The sanitizer preset instruments the test executable only, and the `asan` target builds and runs the tests. Build artifacts remain in `build/asan`.
+The sanitizer preset instruments the test and monitor executables, and the `asan` target builds and runs the C++ tests. Build artifacts remain in `build/asan`.
 
 To test the broker/client connection without SQLite, HTTP, or packet decoding, run the standalone probe:
 
