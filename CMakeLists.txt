@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(MTSCOPE_ENABLE_COVERAGE "Instrument the C++ test executable for gcov coverage" OFF)
+option(MTSCOPE_ENABLE_ASAN "Instrument the C++ test executable with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(MTSCOPE_ENABLE_VALGRIND "Add a target that runs the C++ tests under Valgrind" OFF)
 
 find_package(SQLite3 REQUIRED)
 find_package(Protobuf REQUIRED)
@@ -70,6 +72,10 @@ if(OpenSSL_FOUND)
 	target_compile_definitions(meshat-monitor PRIVATE MTSCOPE_HAVE_OPENSSL=1)
 endif()
 target_compile_options(meshat-monitor PRIVATE -Wall -Wextra -Wpedantic)
+if(MTSCOPE_ENABLE_ASAN)
+	target_compile_options(meshat-monitor PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+	target_link_options(meshat-monitor PRIVATE -fsanitize=address,undefined)
+endif()
 
 install(TARGETS meshat-monitor RUNTIME DESTINATION bin)
 install(DIRECTORY web/ DESTINATION share/meshat-monitor)
@@ -101,6 +107,31 @@ if(BUILD_TESTING)
 	if(MTSCOPE_ENABLE_COVERAGE)
 		target_compile_options(meshat-monitor-tests PRIVATE --coverage)
 		target_link_options(meshat-monitor-tests PRIVATE --coverage)
+	endif()
+	if(MTSCOPE_ENABLE_ASAN)
+		target_compile_options(meshat-monitor-tests PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+		target_link_options(meshat-monitor-tests PRIVATE -fsanitize=address,undefined)
+		add_custom_target(asan
+			COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+			DEPENDS meshat-monitor-tests
+			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+			VERBATIM
+		)
+	endif()
+	if(MTSCOPE_ENABLE_VALGRIND)
+		find_program(VALGRIND_EXECUTABLE valgrind REQUIRED)
+		add_custom_target(valgrind
+			COMMAND ${VALGRIND_EXECUTABLE}
+				--tool=memcheck
+				--leak-check=full
+				--show-leak-kinds=definite,indirect
+				--errors-for-leak-kinds=definite,indirect
+				--error-exitcode=99
+				$<TARGET_FILE:meshat-monitor-tests>
+			DEPENDS meshat-monitor-tests
+			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+			VERBATIM
+		)
 	endif()
 	include(GoogleTest)
 	gtest_discover_tests(meshat-monitor-tests)

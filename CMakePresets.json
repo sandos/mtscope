@@ -19,6 +19,26 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "MTSCOPE_ENABLE_COVERAGE": "ON"
       }
+    },
+    {
+      "name": "asan",
+      "displayName": "ASan and UBSan (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/asan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MTSCOPE_ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "valgrind",
+      "displayName": "Valgrind (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/valgrind",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "MTSCOPE_ENABLE_VALGRIND": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -29,6 +49,14 @@
     {
       "name": "coverage",
       "configurePreset": "coverage"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "valgrind",
+      "configurePreset": "valgrind"
     }
   ]
 }

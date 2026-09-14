@@ -26,6 +26,15 @@ gcovr --root . --filter 'src/' --object-directory build/coverage/CMakeFiles/mesh
 
 The coverage preset instruments the test executable only and keeps coverage artifacts in `build/coverage`.
 
+To run the C++ tests with AddressSanitizer and UndefinedBehaviorSanitizer:
+
+```sh
+cmake --preset asan
+cmake --build --preset asan --target asan
+```
+
+The sanitizer preset instruments the test executable only, and the `asan` target builds and runs the tests. Build artifacts remain in `build/asan`.
+
 To test the broker/client connection without SQLite, HTTP, or packet decoding, run the standalone probe:
 
 ```sh
@@ -40,6 +49,29 @@ The Meshtastic protobuf definitions are included as the `protobufs/` git submodu
 Open `http://localhost:8099`. Use `--topic` to narrow the subscription, for example `msh/SE/2/json/#`.
 
 The same local defaults are available through `./run_local.sh`. It uses `meshat-monitor.db` beside the script and supports `MTSCOPE_DATABASE`, `MTSCOPE_TOPIC`, `MTSCOPE_RETENTION_DAYS`, `MTSCOPE_HTTP_PORT`, and `MTSCOPE_WEB_ROOT` environment overrides. Extra command-line options are passed to the monitor.
+
+To run the local monitor binary with AddressSanitizer and UndefinedBehaviorSanitizer, build the sanitizer monitor target and set `MTSCOPE_ASAN=1`:
+
+```sh
+cmake --preset asan
+cmake --build --preset asan --target meshat-monitor
+MTSCOPE_ASAN=1 ./run_local.sh
+```
+
+`MTSCOPE_ASAN=1` selects `build/asan/meshat-monitor`; it does not rebuild automatically.
+
+Valgrind requires the `valgrind` package. Run the C++ tests under Memcheck with:
+
+```sh
+cmake --preset valgrind
+cmake --build --preset valgrind --target valgrind
+```
+
+For an uber-verification that runs both ASan/UBSan and Valgrind:
+
+```sh
+./verify.sh
+```
 
 The SQLite schema is intentionally fresh-install-only and is not migrated. When upgrading across schema changes, stop the monitor and remove the database before restarting:
 
