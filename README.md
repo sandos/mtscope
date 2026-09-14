@@ -77,12 +77,6 @@ The protobuf definitions are included as the `protobufs/` submodule. Override th
 - The monitor separates logical packets from gateway observations, so repeated observations can be grouped without losing receiver metadata.
 - JSON and protobuf payloads are normalized into measurements for text, position, node info, and telemetry data.
 - Encrypted packets can be decoded with Meshtastic's public default channel key when OpenSSL is available.
-- The standalone `mqtt-probe` checks broker connectivity without packet decoding:
-
-  ```sh
-  MQTT_HOST=mqtt.meshat.se MQTT_PORT=1883 MQTT_TOPIC='msh/#' \
-    ./build/release/mqtt-probe
-  ```
 
 The SQLite schema is fresh-install-only. Remove the database files before restarting after schema changes:
 

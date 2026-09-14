@@ -81,11 +81,6 @@ install(TARGETS meshat-monitor RUNTIME DESTINATION bin)
 install(DIRECTORY web/ DESTINATION share/meshat-monitor)
 
 if(BUILD_TESTING)
-	add_executable(mqtt-probe tests/mqtt_probe.cpp)
-	target_include_directories(mqtt-probe PRIVATE ${MOSQUITTO_INCLUDE_DIR})
-	target_link_libraries(mqtt-probe PRIVATE ${MOSQUITTO_LIBRARY})
-	target_compile_options(mqtt-probe PRIVATE -Wall -Wextra -Wpedantic)
-
 	include(FetchContent)
 	FetchContent_Declare(
 		googletest
