@@ -44,6 +44,37 @@ TEST(ParserTest, DecodesJsonStringEscapes) {
     EXPECT_EQ(packet.measurement->text, "line\nquote: \"mesh\" unicode: \xE2\x98\xBA");
 }
 
+TEST(ParserTest, DecodesAllSimpleJsonEscapes) {
+    const std::string payload = R"({"type":"text","text":"backslash: \\ slash: \/ tab:\t backspace:\b formfeed:\f return:\r"})";
+    const ParsedPacket packet = parse_packet("msh/SE/2/json/LongFast", payload.data(), static_cast<int>(payload.size()));
+
+    ASSERT_TRUE(packet.measurement.has_value());
+    EXPECT_EQ(packet.measurement->text, "backslash: \\ slash: / tab:\t backspace:\b formfeed:\f return:\r");
+}
+
+TEST(ParserTest, ParsesNestedArraysAndPrimitiveValues) {
+    const std::string payload = R"({"type":"telemetry","values":[{"ignored":true},null,false],"batteryLevel":0,"voltage":-1.25e+2})";
+    const ParsedPacket packet = parse_packet("msh/SE/2/json/LongFast", payload.data(), static_cast<int>(payload.size()));
+
+    ASSERT_TRUE(packet.measurement.has_value());
+    EXPECT_EQ(packet.measurement->kind, "telemetry");
+    EXPECT_DOUBLE_EQ(*packet.measurement->battery_level, 0.0);
+    EXPECT_DOUBLE_EQ(*packet.measurement->voltage, -125.0);
+}
+
+TEST(ParserTest, RejectsDuplicateKeysAndTrailingData) {
+    const std::string duplicate = R"({"type":"text","type":"telemetry","text":"wrong"})";
+    const std::string trailing = R"({"type":"text","text":"wrong"} false)";
+
+    const ParsedPacket duplicate_packet = parse_packet("msh/SE/2/json/LongFast", duplicate.data(), static_cast<int>(duplicate.size()));
+    const ParsedPacket trailing_packet = parse_packet("msh/SE/2/json/LongFast", trailing.data(), static_cast<int>(trailing.size()));
+
+    EXPECT_TRUE(duplicate_packet.packet_type.empty());
+    EXPECT_FALSE(duplicate_packet.measurement.has_value());
+    EXPECT_TRUE(trailing_packet.packet_type.empty());
+    EXPECT_FALSE(trailing_packet.measurement.has_value());
+}
+
 TEST(ParserTest, IgnoresMalformedJsonMetadata) {
     const std::string payload = R"({"nested":{"type":"wrong"},"type":"text","text":"unterminated})";
     const ParsedPacket packet = parse_packet("msh/SE/2/json/LongFast", payload.data(), static_cast<int>(payload.size()));
