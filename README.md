@@ -1,5 +1,7 @@
 # Meshtastic Monitor
 
+[![Verify](https://github.com/sandos/mtscope/actions/workflows/verify.yml/badge.svg)](https://github.com/sandos/mtscope/actions/workflows/verify.yml)
+
 Low-overhead monitor for Meshtastic MQTT traffic. It stores packets in SQLite and serves a dashboard for browsing packets, nodes, and measurements.
 
 ## Quick start
